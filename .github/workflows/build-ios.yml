@@ -36,8 +36,7 @@ jobs:
         echo "=== 2. Converting with Safari Web Extension Converter ==="
         rm -rf "$GITHUB_WORKSPACE/GeneratedProject"
         
-        cd "$FULL_RES_PATH"
-        xcrun safari-web-extension-converter . --mobile --no-open --no-interactive --project-location "$GITHUB_WORKSPACE/GeneratedProject" --force
+        xcrun safari-web-extension-converter "$FULL_RES_PATH" --mobile --no-open --no-interactive --project-location "$GITHUB_WORKSPACE/GeneratedProject" --force
         cd "$GITHUB_WORKSPACE"
 
         echo "=== 3. Locating Generated Xcode Project ==="
