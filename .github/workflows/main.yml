@@ -33,9 +33,13 @@ jobs:
         FULL_RES_PATH=$(cd "$RESOURCES_DIR" && pwd)
         echo "Navigating to WebExtension directory: $FULL_RES_PATH"
 
-        echo "=== 2. Converting with Safari Web Extension Converter ==="
+        echo "=== 2. Safari Web Extension Converter Help & Conversion ==="
+        xcrun safari-web-extension-converter --help || true
+
         rm -rf "$GITHUB_WORKSPACE/GeneratedProject"
         
+        cd "$FULL_RES_PATH"
+        xcrun safari-web-extension-converter . --no-open --no-interactive --force --project-location "$GITHUB_WORKSPACE/GeneratedProject" || \
         xcrun safari-web-extension-converter "$FULL_RES_PATH" --no-open --no-interactive --force --project-location "$GITHUB_WORKSPACE/GeneratedProject"
         
         cd "$GITHUB_WORKSPACE"
