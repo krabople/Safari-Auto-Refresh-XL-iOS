@@ -14,9 +14,9 @@ class ViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = UIColor(red: 11/255, green: 15/255, blue: 25/255, alpha: 1.0)
 
-        // Main Scroll View Setup
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
+
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
 
@@ -33,34 +33,36 @@ class ViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
 
-        // Stack View Container
         let mainStack = UIStackView()
         mainStack.axis = .vertical
-        mainStack.spacing = 20
+        mainStack.spacing = 18
         mainStack.alignment = .fill
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(mainStack)
 
         NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
+            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
         ])
 
         // 1. Header Card
         let headerCard = createCardView()
         let logoLabel = UILabel()
         logoLabel.text = "⚡ Auto Refresh XL"
-        logoLabel.font = UIFont.systemFont(ofSize: 24, weight: .black)
+        logoLabel.font = UIFont.systemFont(ofSize: 22, weight: .black)
         logoLabel.textColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 1.0)
         logoLabel.textAlignment = .center
+        logoLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let subLabel = UILabel()
         subLabel.text = "Safari Web Extension & Page Monitor for iOS"
-        subLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        subLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         subLabel.textColor = UIColor(red: 148/255, green: 163/255, blue: 184/255, alpha: 1.0)
         subLabel.textAlignment = .center
+        subLabel.numberOfLines = 0
+        subLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let statusBadge = UILabel()
         statusBadge.text = "  ✓ EXTENSION INSTALLED & READY  "
@@ -70,6 +72,7 @@ class ViewController: UIViewController {
         statusBadge.layer.cornerRadius = 10
         statusBadge.layer.masksToBounds = true
         statusBadge.textAlignment = .center
+        statusBadge.translatesAutoresizingMaskIntoConstraints = false
 
         let headerStack = UIStackView(arrangedSubviews: [logoLabel, subLabel, statusBadge])
         headerStack.axis = .vertical
@@ -87,18 +90,15 @@ class ViewController: UIViewController {
         ])
         mainStack.addArrangedSubview(headerCard)
 
-        // 2. Open Settings Button (Primary CTA)
+        // 2. Open Settings Button
         let openSettingsBtn = UIButton(type: .system)
         openSettingsBtn.setTitle("⚙️ Open Safari Settings", for: .normal)
-        openSettingsBtn.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .bold)
+        openSettingsBtn.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .bold)
         openSettingsBtn.setTitleColor(.black, for: .normal)
         openSettingsBtn.backgroundColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 1.0)
         openSettingsBtn.layer.cornerRadius = 12
-        openSettingsBtn.layer.shadowColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 0.4).cgColor
-        openSettingsBtn.layer.shadowOffset = CGSize(width: 0, height: 4)
-        openSettingsBtn.layer.shadowRadius = 8
-        openSettingsBtn.layer.shadowOpacity = 0.8
-        openSettingsBtn.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        openSettingsBtn.translatesAutoresizingMaskIntoConstraints = false
+        openSettingsBtn.heightAnchor.constraint(equalToConstant: 48).isActive = true
         openSettingsBtn.addTarget(self, action: #selector(openSettingsTapped), for: .touchUpInside)
         mainStack.addArrangedSubview(openSettingsBtn)
 
@@ -125,7 +125,7 @@ class ViewController: UIViewController {
 
         let setupContentStack = UIStackView(arrangedSubviews: [setupTitle, stepsStack])
         setupContentStack.axis = .vertical
-        setupContentStack.spacing = 14
+        setupContentStack.spacing = 12
         setupContentStack.translatesAutoresizingMaskIntoConstraints = false
         setupCard.addSubview(setupContentStack)
 
@@ -143,7 +143,7 @@ class ViewController: UIViewController {
         
         let featuresStack = UIStackView()
         featuresStack.axis = .vertical
-        featuresStack.spacing = 16
+        featuresStack.spacing = 14
         featuresStack.translatesAutoresizingMaskIntoConstraints = false
 
         let features = [
@@ -163,7 +163,7 @@ class ViewController: UIViewController {
 
         let guideContentStack = UIStackView(arrangedSubviews: [guideTitle, featuresStack])
         guideContentStack.axis = .vertical
-        guideContentStack.spacing = 14
+        guideContentStack.spacing = 12
         guideContentStack.translatesAutoresizingMaskIntoConstraints = false
         guideCard.addSubview(guideContentStack)
 
@@ -176,7 +176,6 @@ class ViewController: UIViewController {
         mainStack.addArrangedSubview(guideCard)
     }
 
-    // Helper UI Factory Methods
     private func createCardView() -> UIView {
         let card = UIView()
         card.backgroundColor = UIColor(red: 22/255, green: 30/255, blue: 46/255, alpha: 1.0)
@@ -190,34 +189,38 @@ class ViewController: UIViewController {
     private func createSectionTitle(_ text: String) -> UILabel {
         let label = UILabel()
         label.text = text
-        label.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        label.font = UIFont.systemFont(ofSize: 17, weight: .bold)
         label.textColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 1.0)
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }
 
     private func createStepRow(number: String, title: String, description: String) -> UIView {
         let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
 
         let numBadge = UILabel()
         numBadge.text = number
-        numBadge.font = UIFont.systemFont(ofSize: 13, weight: .bold)
+        numBadge.font = UIFont.systemFont(ofSize: 12, weight: .bold)
         numBadge.textColor = .black
         numBadge.backgroundColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 1.0)
-        numBadge.layer.cornerRadius = 12
+        numBadge.layer.cornerRadius = 11
         numBadge.layer.masksToBounds = true
         numBadge.textAlignment = .center
         numBadge.translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .bold)
+        titleLabel.font = UIFont.systemFont(ofSize: 13, weight: .bold)
         titleLabel.textColor = .white
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let descLabel = UILabel()
         descLabel.text = description
         descLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
         descLabel.textColor = UIColor(red: 148/255, green: 163/255, blue: 184/255, alpha: 1.0)
         descLabel.numberOfLines = 0
+        descLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let textStack = UIStackView(arrangedSubviews: [titleLabel, descLabel])
         textStack.axis = .vertical
@@ -230,10 +233,10 @@ class ViewController: UIViewController {
         NSLayoutConstraint.activate([
             numBadge.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             numBadge.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
-            numBadge.widthAnchor.constraint(equalToConstant: 24),
-            numBadge.heightAnchor.constraint(equalToConstant: 24),
+            numBadge.widthAnchor.constraint(equalToConstant: 22),
+            numBadge.heightAnchor.constraint(equalToConstant: 22),
 
-            textStack.leadingAnchor.constraint(equalTo: numBadge.trailingAnchor, constant: 12),
+            textStack.leadingAnchor.constraint(equalTo: numBadge.trailingAnchor, constant: 10),
             textStack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             textStack.topAnchor.constraint(equalTo: container.topAnchor),
             textStack.bottomAnchor.constraint(equalTo: container.bottomAnchor)
@@ -244,17 +247,20 @@ class ViewController: UIViewController {
 
     private func createFeatureRow(title: String, description: String) -> UIView {
         let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .bold)
+        titleLabel.font = UIFont.systemFont(ofSize: 13, weight: .bold)
         titleLabel.textColor = UIColor(red: 248/255, green: 250/255, blue: 252/255, alpha: 1.0)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let descLabel = UILabel()
         descLabel.text = description
         descLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
         descLabel.textColor = UIColor(red: 148/255, green: 163/255, blue: 184/255, alpha: 1.0)
         descLabel.numberOfLines = 0
+        descLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let stack = UIStackView(arrangedSubviews: [titleLabel, descLabel])
         stack.axis = .vertical
