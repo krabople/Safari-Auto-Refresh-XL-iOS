@@ -36,6 +36,9 @@
   window.addEventListener('touchstart', unlockAudioOnTouch, { capture: true, passive: true });
   window.addEventListener('click', unlockAudioOnTouch, { capture: true, passive: true });
 
+  let monitorIntervalId = null;
+  let monitorObserver = null;
+
   chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
     if (chrome.runtime.lastError || !response || !response.state) return;
     currentTabState = response.state;
@@ -51,23 +54,71 @@
       updateOverlayCountdown(request.remainingSeconds, request.refreshCount, request.maxRefreshes);
     } else if (request.type === 'REFRESH_STARTED') {
       currentTabState = request.state;
+      hasTriggeredTarget = false;
       getUnlockedAudioContext();
       initContentFeatures();
     } else if (request.type === 'REFRESH_STOPPED') {
       if (currentTabState) currentTabState.enabled = false;
+      stopMonitoringLoop();
       removeOverlay();
     } else if (request.type === 'TEST_SOUND') {
       playAlertSound();
     } else if (request.type === 'TEST_NOTIFY') {
       showWebNotification('Auto Refresh XL', 'Notification test successful! Alerts are working.');
+    } else if (request.type === 'REQUEST_NOTIFICATION_PERMISSION') {
+      requestWebNotificationPermission();
     }
   });
+
+  function requestWebNotificationPermission() {
+    if (typeof Notification !== 'undefined') {
+      Notification.requestPermission().then((perm) => {
+        if (perm === 'granted') {
+          try {
+            new Notification('Auto Refresh XL', {
+              body: 'Web Notifications are active! You will receive alerts when target text is detected.',
+              icon: 'icons/icon128.png'
+            });
+          } catch (e) {}
+        } else {
+          alert('Notification permission state: ' + perm + '\n\nPlease enable Notifications for Safari in your iPhone Settings app.');
+        }
+      }).catch(() => {
+        alert('Please enable Web Notifications for Safari in iOS Settings.');
+      });
+    } else {
+      alert('Web Notification permission requested.');
+    }
+  }
 
   function initContentFeatures() {
     if (!currentTabState) return;
 
     if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
       checkPageMonitoring();
+
+      // Continuous DOM polling loop every 500ms for dynamic JS/React rendering
+      if (!monitorIntervalId) {
+        monitorIntervalId = setInterval(() => {
+          if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
+            checkPageMonitoring();
+          } else {
+            stopMonitoringLoop();
+          }
+        }, 500);
+      }
+
+      // Continuous DOM MutationObserver
+      if (!monitorObserver && document.body) {
+        try {
+          monitorObserver = new MutationObserver(() => {
+            if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
+              checkPageMonitoring();
+            }
+          });
+          monitorObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+        } catch (e) {}
+      }
     }
 
     if (currentTabState.overlayEnabled) {
@@ -76,6 +127,17 @@
 
     if (currentTabState.stopOnInteraction) {
       setupUserInteractionListener();
+    }
+  }
+
+  function stopMonitoringLoop() {
+    if (monitorIntervalId) {
+      clearInterval(monitorIntervalId);
+      monitorIntervalId = null;
+    }
+    if (monitorObserver) {
+      monitorObserver.disconnect();
+      monitorObserver = null;
     }
   }
 
@@ -97,7 +159,7 @@
     } else if (currentTabState.matchType === 'regex') {
       try {
         const regex = new RegExp(target, 'i');
-        const bodyText = document.body.innerText || '';
+        const bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
         isFound = regex.test(bodyText);
         if (isFound) {
           matchedNode = findTextNodeMatching(regex);
@@ -106,7 +168,7 @@
         console.warn('Invalid Regular Expression:', target);
       }
     } else {
-      const bodyText = document.body.innerText || '';
+      const bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
       isFound = bodyText.toLowerCase().includes(target.toLowerCase());
       if (isFound) {
         matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'));
@@ -118,6 +180,7 @@
 
     if (conditionMet) {
       hasTriggeredTarget = true;
+      stopMonitoringLoop();
 
       if (currentTabState.actionSound) {
         playAlertSound();
@@ -211,63 +274,39 @@
   }
 
   function playAlertSound() {
-    // 1. Dual Playback: HTML5 Audio Element (Works everywhere in Safari)
-    try {
-      const uri = getChimeAudioURI();
-      if (uri) {
-        const audio = new Audio(uri);
-        audio.play().catch(e => console.warn('HTML5 audio play error:', e));
-      }
-    } catch (e) {}
+    const playBurst = () => {
+      try {
+        const uri = getChimeAudioURI();
+        if (uri) {
+          const audio = new Audio(uri);
+          audio.play().catch(e => console.warn('Audio play error:', e));
+        }
+      } catch (e) {}
 
-    // 2. Dual Playback: Web Audio API Synth
-    try {
-      const ctx = getUnlockedAudioContext();
-      if (!ctx) return;
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
+      try {
+        const ctx = getUnlockedAudioContext();
+        if (ctx) {
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+          const now = ctx.currentTime;
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(1046.5, now);
+          gain1.gain.setValueAtTime(0.4, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.35);
+        }
+      } catch (e) {}
+    };
 
-      const now = ctx.currentTime;
-
-      // Tone 1 - C6 (1046.5 Hz)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(1046.5, now);
-      gain1.gain.setValueAtTime(0.4, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.35);
-
-      // Tone 2 - E6 (1318.5 Hz)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1318.5, now + 0.12);
-      gain2.gain.setValueAtTime(0.4, now + 0.12);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.5);
-
-      // Tone 3 - G6 (1567.98 Hz)
-      const osc3 = ctx.createOscillator();
-      const gain3 = ctx.createGain();
-      osc3.type = 'sine';
-      osc3.frequency.setValueAtTime(1567.98, now + 0.25);
-      gain3.gain.setValueAtTime(0.5, now + 0.25);
-      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-      osc3.connect(gain3);
-      gain3.connect(ctx.destination);
-      osc3.start(now + 0.25);
-      osc3.stop(now + 0.8);
-    } catch (e) {
-      console.warn('Audio playback error:', e);
-    }
+    playBurst();
+    setTimeout(playBurst, 500);
+    setTimeout(playBurst, 1000);
   }
 
   function showWebNotification(title, message) {

@@ -287,4 +287,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (request.type === 'SHOW_NOTIFICATION') {
+    if (chrome.notifications && chrome.notifications.create) {
+      chrome.notifications.create(`notify_${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: request.title || 'Auto Refresh XL - Target Detected!',
+        message: request.message || 'Target detected on webpage!',
+        priority: 2
+      });
+    }
+    sendResponse({ success: true });
+    return true;
+  }
 });

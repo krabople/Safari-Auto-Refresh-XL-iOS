@@ -326,27 +326,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (btnTestNotify) {
-    btnTestNotify.addEventListener('click', async () => {
+    btnTestNotify.addEventListener('click', () => {
       playPopupSound();
 
-      if (typeof Notification !== 'undefined') {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          try {
-            new Notification('Auto Refresh XL', {
-              body: 'Web Notifications are enabled and active in Safari!',
-              icon: 'icons/icon128.png'
-            });
-          } catch (e) {}
-        } else {
-          alert('Notification permission state: ' + perm + '. Please check website permissions in Safari Settings.');
-        }
-      } else {
-        alert('Web Notifications requested.');
-      }
-
       if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_NOTIFY' }).catch(() => {});
+        chrome.tabs.sendMessage(currentTabId, { type: 'REQUEST_NOTIFICATION_PERMISSION' }).catch(() => {});
+      } else {
+        alert('Please visit a webpage in Safari before requesting notification permission.');
       }
     });
   }
