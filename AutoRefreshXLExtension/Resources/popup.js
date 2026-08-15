@@ -115,10 +115,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     conditionType.value = state.condition || 'appears';
     actStop.checked = state.actionStop !== false;
     actSound.checked = state.actionSound !== false;
-    actNotify.checked = state.actionNotify !== false;
+    if (actNotify) actNotify.checked = state.actionNotify !== false;
     actHighlight.checked = state.actionHighlight !== false;
     actScroll.checked = state.actionScroll !== false;
-    actFocus.checked = state.actionFocus !== false;
+    if (actFocus) actFocus.checked = state.actionFocus !== false;
 
     updateActiveStatus(state.enabled);
   }
@@ -128,17 +128,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       statusDot.classList.add('active');
       statusText.classList.add('active');
       statusText.textContent = 'ACTIVE';
-
-      startStopBtn.classList.add('stopping');
+      startStopBtn.classList.remove('btn-primary');
+      startStopBtn.classList.add('btn-danger');
       startStopText.textContent = 'STOP REFRESH';
     } else {
       statusDot.classList.remove('active');
       statusText.classList.remove('active');
-      statusText.textContent = 'IDLE';
-
-      startStopBtn.classList.remove('stopping');
+      statusText.textContent = 'INACTIVE';
+      countdownDisplay.textContent = '00:00';
+      startStopBtn.classList.remove('btn-danger');
+      startStopBtn.classList.add('btn-primary');
       startStopText.textContent = 'START REFRESH';
-      countdownDisplay.textContent = '--:--';
     }
   }
 
@@ -151,11 +151,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   startStopBtn.addEventListener('click', () => {
-    if (!currentTabId) return;
+    playPopupSound();
+    const isActive = statusDot.classList.contains('active');
 
-    const isRunning = statusText.textContent === 'ACTIVE';
-
-    if (isRunning) {
+    if (isActive) {
       chrome.runtime.sendMessage({ type: 'STOP_REFRESH', tabId: currentTabId }, () => {
         updateActiveStatus(false);
       });
@@ -180,12 +179,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         targetText: targetText.value.trim(),
         matchType: matchType.value,
         condition: conditionType.value,
-        actionStop: actStop.checked,
-        actionSound: actSound.checked,
-        actionNotify: actNotify.checked,
-        actionHighlight: actHighlight.checked,
-        actionScroll: actScroll.checked,
-        actionFocus: actFocus.checked
+        actionStop: actStop ? actStop.checked : true,
+        actionSound: actSound ? actSound.checked : true,
+        actionNotify: false,
+        actionHighlight: actHighlight ? actHighlight.checked : true,
+        actionScroll: actScroll ? actScroll.checked : true,
+        actionFocus: false
       };
 
       chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (res) => {
