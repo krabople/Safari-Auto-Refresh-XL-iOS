@@ -273,14 +273,8 @@ class ViewController: UIViewController {
     }
 
     @objc private func openSettingsTapped() {
-        SFSafariApplication.showPreferencesForExtension(withIdentifier: "com.krabople.SafariAutoRefreshXL.Extension") { error in
-            if error != nil {
-                DispatchQueue.main.async {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-            }
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 }
