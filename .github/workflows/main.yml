@@ -38,11 +38,14 @@ jobs:
         
         xcrun safari-web-extension-converter "$FULL_RES_PATH" --swift --ios-only --no-open --no-prompt --force --project-location "$GITHUB_WORKSPACE/GeneratedProject"
         
-        echo "=== 2b. Injecting Custom Host App ViewController & UI ==="
+        echo "=== 2b. Injecting Custom Host App Components ==="
         VC_PATH=$(find "$GITHUB_WORKSPACE/GeneratedProject" -name "ViewController.swift" | head -n 1)
         if [ -n "$VC_PATH" ]; then
-          cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$VC_PATH"
-          echo "Successfully injected custom ViewController.swift at $VC_PATH"
+          PROJ_APP_DIR=$(dirname "$VC_PATH")
+          cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$PROJ_APP_DIR/ViewController.swift"
+          cp "$GITHUB_WORKSPACE/AutoRefreshXL/AppDelegate.swift" "$PROJ_APP_DIR/AppDelegate.swift"
+          cp "$GITHUB_WORKSPACE/AutoRefreshXL/SceneDelegate.swift" "$PROJ_APP_DIR/SceneDelegate.swift"
+          echo "Successfully injected custom ViewController, AppDelegate & SceneDelegate at $PROJ_APP_DIR"
         fi
 
         echo "=== 2c. Stripping App Group Entitlements for Free Apple ID / Sideloadly Compatibility ==="
