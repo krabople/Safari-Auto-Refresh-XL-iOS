@@ -314,25 +314,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const btnTestSound = document.getElementById('btnTestSound');
-  const btnTestNotify = document.getElementById('btnTestNotify');
 
   if (btnTestSound) {
     btnTestSound.addEventListener('click', () => {
       playPopupSound();
       if (currentTabId) {
         chrome.tabs.sendMessage(currentTabId, { type: 'TEST_SOUND' }).catch(() => {});
-      }
-    });
-  }
-
-  if (btnTestNotify) {
-    btnTestNotify.addEventListener('click', () => {
-      playPopupSound();
-
-      if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { type: 'REQUEST_NOTIFICATION_PERMISSION' }).catch(() => {});
-      } else {
-        alert('Please visit a webpage in Safari before requesting notification permission.');
       }
     });
   }

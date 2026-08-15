@@ -155,6 +155,8 @@
   }
 
   function checkPageMonitoring() {
+    if (!currentTabState || currentTabState.refreshCount < 1) return;
+
     const target = currentTabState.targetText.trim();
     if (!target) return;
 
@@ -195,14 +197,10 @@
       hasTriggeredTarget = true;
       stopMonitoringLoop();
 
-      triggerNativeAlert(currentTabState.targetText);
+      showTargetAlertBanner(currentTabState.targetText);
 
       if (currentTabState.actionSound) {
         playAlertSound();
-      }
-
-      if (currentTabState.actionNotify) {
-        showWebNotification('Auto Refresh XL - Target Detected!', `Target expression "${currentTabState.targetText}" was detected!`);
       }
 
       if (matchedNode && currentTabState.actionHighlight) {
@@ -223,6 +221,58 @@
         }
       }
     }
+  }
+
+  function showTargetAlertBanner(targetText) {
+    if (document.getElementById('arp-target-alert-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'arp-target-alert-banner';
+    banner.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #f8fafc;
+      border: 2px solid #00f2fe;
+      border-radius: 16px;
+      padding: 16px 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,242,254,0.4);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, sans-serif;
+      text-align: center;
+      min-width: 280px;
+    `;
+
+    banner.innerHTML = `
+      <div style="font-size: 18px; font-weight: 800; color: #00f2fe; margin-bottom: 4px;">
+        🎯 TARGET DETECTED!
+      </div>
+      <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
+        Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on this page.
+      </div>
+      <button id="arp-banner-dismiss" style="
+        background: linear-gradient(135deg, #00f2fe, #0284c7);
+        color: #000;
+        border: none;
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 13px;
+        cursor: pointer;
+      ">Dismiss Alert</button>
+    `;
+
+    document.body.appendChild(banner);
+
+    document.getElementById('arp-banner-dismiss')?.addEventListener('click', () => {
+      banner.remove();
+    });
+  }
+
+  function escapeHTML(str) {
+    return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
   }
 
   function escapeRegExp(string) {
