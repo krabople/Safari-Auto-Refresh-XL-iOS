@@ -170,7 +170,57 @@
     element.style.transition = 'all 0.3s ease';
   }
 
+  function getChimeAudioURI() {
+    try {
+      const sampleRate = 11025;
+      const numSamples = Math.floor(sampleRate * 0.45);
+      const buffer = new Uint8Array(44 + numSamples);
+      buffer[0] = 82; buffer[1] = 73; buffer[2] = 70; buffer[3] = 70;
+      const fileSize = 36 + numSamples;
+      buffer[4] = fileSize & 0xff; buffer[5] = (fileSize >> 8) & 0xff;
+      buffer[6] = (fileSize >> 16) & 0xff; buffer[7] = (fileSize >> 24) & 0xff;
+      buffer[8] = 87; buffer[9] = 65; buffer[10] = 86; buffer[11] = 69;
+      buffer[12] = 102; buffer[13] = 109; buffer[14] = 116; buffer[15] = 32;
+      buffer[16] = 16; buffer[17] = 0; buffer[18] = 0; buffer[19] = 0;
+      buffer[20] = 1; buffer[21] = 0; buffer[22] = 1; buffer[23] = 0;
+      buffer[24] = sampleRate & 0xff; buffer[25] = (sampleRate >> 8) & 0xff;
+      buffer[26] = 0; buffer[27] = 0;
+      buffer[28] = sampleRate & 0xff; buffer[29] = (sampleRate >> 8) & 0xff;
+      buffer[30] = 0; buffer[31] = 0;
+      buffer[32] = 1; buffer[33] = 0; buffer[34] = 8; buffer[35] = 0;
+      buffer[36] = 100; buffer[37] = 97; buffer[38] = 116; buffer[39] = 97;
+      buffer[40] = numSamples & 0xff; buffer[41] = (numSamples >> 8) & 0xff;
+      buffer[42] = (numSamples >> 16) & 0xff; buffer[43] = (numSamples >> 24) & 0xff;
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const freq = i < numSamples * 0.5 ? 880 : 1320;
+        const sample = Math.sin(2 * Math.PI * freq * t);
+        const decay = 1 - (i / numSamples);
+        buffer[44 + i] = Math.floor(128 + sample * 110 * decay);
+      }
+
+      let binary = '';
+      for (let i = 0; i < buffer.byteLength; i++) {
+        binary += String.fromCharCode(buffer[i]);
+      }
+      return 'data:audio/wav;base64,' + btoa(binary);
+    } catch (e) {
+      return '';
+    }
+  }
+
   function playAlertSound() {
+    // 1. Dual Playback: HTML5 Audio Element (Works everywhere in Safari)
+    try {
+      const uri = getChimeAudioURI();
+      if (uri) {
+        const audio = new Audio(uri);
+        audio.play().catch(e => console.warn('HTML5 audio play error:', e));
+      }
+    } catch (e) {}
+
+    // 2. Dual Playback: Web Audio API Synth
     try {
       const ctx = getUnlockedAudioContext();
       if (!ctx) return;
