@@ -9,6 +9,19 @@
   let dragOffsetY = 0;
   let hasTriggeredTarget = false;
 
+  function triggerNativeAlert(targetText) {
+    const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
+    try {
+      if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
+        browser.runtime.sendNativeMessage(payload);
+      } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
+        chrome.runtime.sendNativeMessage(payload);
+      }
+    } catch (e) {
+      console.warn('Native message error:', e);
+    }
+  }
+
   let sharedAudioCtx = null;
 
   function getUnlockedAudioContext() {
@@ -181,6 +194,8 @@
     if (conditionMet) {
       hasTriggeredTarget = true;
       stopMonitoringLoop();
+
+      triggerNativeAlert(currentTabState.targetText);
 
       if (currentTabState.actionSound) {
         playAlertSound();

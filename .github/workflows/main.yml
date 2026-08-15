@@ -48,6 +48,12 @@ jobs:
           echo "Successfully injected custom ViewController, AppDelegate & SceneDelegate at $PROJ_APP_DIR"
         fi
 
+        HANDLER_PATH=$(find "$GITHUB_WORKSPACE/GeneratedProject" -name "SafariWebExtensionHandler.swift" | head -n 1)
+        if [ -n "$HANDLER_PATH" ]; then
+          cp "$GITHUB_WORKSPACE/AutoRefreshXLExtension/SafariWebExtensionHandler.swift" "$HANDLER_PATH"
+          echo "Successfully injected native SafariWebExtensionHandler.swift at $HANDLER_PATH"
+        fi
+
         echo "=== 2c. Stripping App Group Entitlements for Free Apple ID / Sideloadly Compatibility ==="
         EMPTY_ENTITLEMENTS='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict/></plist>'
         find "$GITHUB_WORKSPACE/GeneratedProject" -name "*.entitlements" | while read -r ent_file; do

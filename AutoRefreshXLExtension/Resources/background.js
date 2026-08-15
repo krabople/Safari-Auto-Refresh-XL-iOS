@@ -1,6 +1,17 @@
-// Auto Refresh XL - iOS Safari Extension Service Worker
-
 const activeTabStates = {};
+
+function triggerNativeAlert(targetText) {
+  const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
+  try {
+    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
+      browser.runtime.sendNativeMessage(payload);
+    } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
+      chrome.runtime.sendNativeMessage(payload);
+    }
+  } catch (e) {
+    console.warn('Native message error:', e);
+  }
+}
 
 const DEFAULT_TAB_STATE = {
   enabled: false,
@@ -256,6 +267,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'TARGET_DETECTED') {
     const tabId = targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
+
+    triggerNativeAlert(state ? state.targetText : '');
 
     if (state) {
       if (state.actionStop) {
