@@ -38,6 +38,13 @@ jobs:
         
         xcrun safari-web-extension-converter "$FULL_RES_PATH" --swift --ios-only --no-open --no-prompt --force --project-location "$GITHUB_WORKSPACE/GeneratedProject"
         
+        echo "=== 2b. Injecting Custom Host App ViewController & UI ==="
+        VC_PATH=$(find "$GITHUB_WORKSPACE/GeneratedProject" -name "ViewController.swift" | head -n 1)
+        if [ -n "$VC_PATH" ]; then
+          cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$VC_PATH"
+          echo "Successfully injected custom ViewController.swift at $VC_PATH"
+        fi
+
         cd "$GITHUB_WORKSPACE"
 
         echo "=== 3. Locating Generated Xcode Project ==="
