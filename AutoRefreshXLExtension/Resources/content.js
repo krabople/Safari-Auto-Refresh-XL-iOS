@@ -9,6 +9,33 @@
   let dragOffsetY = 0;
   let hasTriggeredTarget = false;
 
+  let sharedAudioCtx = null;
+
+  function getUnlockedAudioContext() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!sharedAudioCtx) {
+        sharedAudioCtx = new AudioCtx();
+      }
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => {});
+      }
+      return sharedAudioCtx;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Unlock AudioContext on user interaction with page
+  const unlockAudioOnTouch = () => {
+    getUnlockedAudioContext();
+    window.removeEventListener('touchstart', unlockAudioOnTouch, true);
+    window.removeEventListener('click', unlockAudioOnTouch, true);
+  };
+  window.addEventListener('touchstart', unlockAudioOnTouch, { capture: true, passive: true });
+  window.addEventListener('click', unlockAudioOnTouch, { capture: true, passive: true });
+
   chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
     if (chrome.runtime.lastError || !response || !response.state) return;
     currentTabState = response.state;
@@ -24,10 +51,15 @@
       updateOverlayCountdown(request.remainingSeconds, request.refreshCount, request.maxRefreshes);
     } else if (request.type === 'REFRESH_STARTED') {
       currentTabState = request.state;
+      getUnlockedAudioContext();
       initContentFeatures();
     } else if (request.type === 'REFRESH_STOPPED') {
       if (currentTabState) currentTabState.enabled = false;
       removeOverlay();
+    } else if (request.type === 'TEST_SOUND') {
+      playAlertSound();
+    } else if (request.type === 'TEST_NOTIFY') {
+      showWebNotification('Auto Refresh XL', 'Notification test successful! Alerts are working.');
     }
   });
 
@@ -91,6 +123,10 @@
         playAlertSound();
       }
 
+      if (currentTabState.actionNotify) {
+        showWebNotification('Auto Refresh XL - Target Detected!', `Target expression "${currentTabState.targetText}" was detected!`);
+      }
+
       if (matchedNode && currentTabState.actionHighlight) {
         highlightNode(matchedNode);
       }
@@ -136,33 +172,71 @@
 
   function playAlertSound() {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      const ctx = getUnlockedAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
 
+      const now = ctx.currentTime;
+
+      // Tone 1 - C6 (1046.5 Hz)
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
-      gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc1.frequency.setValueAtTime(1046.5, now);
+      gain1.gain.setValueAtTime(0.4, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
-      osc1.start(ctx.currentTime);
-      osc1.stop(ctx.currentTime + 0.4);
+      osc1.start(now);
+      osc1.stop(now + 0.35);
 
+      // Tone 2 - E6 (1318.5 Hz)
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(987.77, ctx.currentTime + 0.15);
-      gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.15);
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      osc2.frequency.setValueAtTime(1318.5, now + 0.12);
+      gain2.gain.setValueAtTime(0.4, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
-      osc2.start(ctx.currentTime + 0.15);
-      osc2.stop(ctx.currentTime + 0.7);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.5);
+
+      // Tone 3 - G6 (1567.98 Hz)
+      const osc3 = ctx.createOscillator();
+      const gain3 = ctx.createGain();
+      osc3.type = 'sine';
+      osc3.frequency.setValueAtTime(1567.98, now + 0.25);
+      gain3.gain.setValueAtTime(0.5, now + 0.25);
+      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc3.connect(gain3);
+      gain3.connect(ctx.destination);
+      osc3.start(now + 0.25);
+      osc3.stop(now + 0.8);
     } catch (e) {
-      console.warn('Audio playback restricted:', e);
+      console.warn('Audio playback error:', e);
+    }
+  }
+
+  function showWebNotification(title, message) {
+    if (typeof Notification === 'undefined') return;
+
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body: message });
+      } catch (e) {
+        console.warn('Notification error:', e);
+      }
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          try {
+            new Notification(title, { body: message });
+          } catch (e) {}
+        }
+      });
     }
   }
 

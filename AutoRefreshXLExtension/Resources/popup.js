@@ -264,4 +264,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       chrome.tabs.create({ url: 'https://buymeacoffee.com/krabople' });
     });
   }
+
+  const btnTestSound = document.getElementById('btnTestSound');
+  const btnTestNotify = document.getElementById('btnTestNotify');
+
+  if (btnTestSound) {
+    btnTestSound.addEventListener('click', () => {
+      if (currentTabId) {
+        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_SOUND' });
+      }
+    });
+  }
+
+  if (btnTestNotify) {
+    btnTestNotify.addEventListener('click', () => {
+      if (currentTabId) {
+        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_NOTIFY' });
+      }
+    });
+  }
 });
