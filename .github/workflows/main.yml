@@ -64,10 +64,10 @@ jobs:
         
         echo "Selected Scheme: '$SCHEME'"
 
-        echo "=== 5. Compiling iOS Application ==="
+        echo "=== 5. Compiling Real ARM64 iOS Application (iphoneos SDK) ==="
         xcodebuild -project "$PROJ_NAME" \
                    -scheme "$SCHEME" \
-                   -sdk iphonesimulator \
+                   -sdk iphoneos \
                    -configuration Release \
                    -derivedDataPath "$GITHUB_WORKSPACE/build" \
                    CODE_SIGNING_ALLOWED=NO \
