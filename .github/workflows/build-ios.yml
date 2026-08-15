@@ -45,6 +45,13 @@ jobs:
           echo "Successfully injected custom ViewController.swift at $VC_PATH"
         fi
 
+        echo "=== 2c. Stripping App Group Entitlements for Free Apple ID / Sideloadly Compatibility ==="
+        EMPTY_ENTITLEMENTS='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict/></plist>'
+        find "$GITHUB_WORKSPACE/GeneratedProject" -name "*.entitlements" | while read -r ent_file; do
+          echo "$EMPTY_ENTITLEMENTS" > "$ent_file"
+          echo "Cleared App Groups from: $ent_file"
+        done
+
         cd "$GITHUB_WORKSPACE"
 
         echo "=== 3. Locating Generated Xcode Project ==="
@@ -80,6 +87,7 @@ jobs:
                    CODE_SIGNING_ALLOWED=NO \
                    CODE_SIGNING_REQUIRED=NO \
                    CODE_SIGN_IDENTITY="" \
+                   CODE_SIGN_ENTITLEMENTS="" \
                    build
 
         cd "$GITHUB_WORKSPACE"
