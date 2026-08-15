@@ -1,0 +1,100 @@
+name: Build iOS Safari Extension App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Select Xcode Version
+      run: |
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        xcodebuild -version
+
+    - name: Build WebExtension & iOS App IPA
+      run: |
+        set -e
+        echo "=== 1. Locating WebExtension Resources ==="
+        MANIFEST_PATH=$(find . -name "manifest.json" | head -n 1)
+
+        if [ -z "$MANIFEST_PATH" ]; then
+          echo "Error: manifest.json not found in repository."
+          exit 1
+        fi
+
+        RESOURCES_DIR=$(dirname "$MANIFEST_PATH")
+        FULL_RES_PATH=$(cd "$RESOURCES_DIR" && pwd)
+        echo "Navigating to WebExtension directory: $FULL_RES_PATH"
+
+        echo "=== 2. Converting with Safari Web Extension Converter ==="
+        rm -rf "$GITHUB_WORKSPACE/GeneratedProject"
+        
+        cd "$FULL_RES_PATH"
+        xcrun safari-web-extension-converter . --mobile --no-open --no-interactive --project-location "$GITHUB_WORKSPACE/GeneratedProject" --force
+        cd "$GITHUB_WORKSPACE"
+
+        echo "=== 3. Locating Generated Xcode Project ==="
+        XCODEPROJ=$(find ./GeneratedProject -name "*.xcodeproj" | head -n 1)
+        if [ -z "$XCODEPROJ" ]; then
+          echo "Error: Xcode project failed to generate."
+          exit 1
+        fi
+        
+        PROJ_DIR=$(dirname "$XCODEPROJ")
+        PROJ_NAME=$(basename "$XCODEPROJ")
+        echo "Found Xcode project: $PROJ_NAME at $PROJ_DIR"
+
+        cd "$PROJ_DIR"
+
+        echo "=== 4. Identifying Build Schemes ==="
+        xcodebuild -list -project "$PROJ_NAME"
+        
+        # Dynamically find the iOS App scheme
+        SCHEME=$(xcodebuild -list -project "$PROJ_NAME" | grep -A 15 "Schemes:" | tail -n +2 | sed 's/^[ \t]*//' | grep "(iOS)" | head -n 1)
+        if [ -z "$SCHEME" ]; then
+          SCHEME=$(xcodebuild -list -project "$PROJ_NAME" | grep -A 15 "Schemes:" | tail -n +2 | sed 's/^[ \t]*//' | head -n 1)
+        fi
+        
+        echo "Selected Scheme: '$SCHEME'"
+
+        echo "=== 5. Compiling iOS Application ==="
+        xcodebuild -project "$PROJ_NAME" \
+                   -scheme "$SCHEME" \
+                   -sdk iphonesimulator \
+                   -configuration Release \
+                   -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                   CODE_SIGNING_ALLOWED=NO \
+                   CODE_SIGNING_REQUIRED=NO \
+                   CODE_SIGN_IDENTITY="" \
+                   build
+
+        cd "$GITHUB_WORKSPACE"
+
+        echo "=== 6. Locating Compiled .app Bundle ==="
+        APP_PATH=$(find "$GITHUB_WORKSPACE/build" -name "*.app" -type d | grep -v "\.appex" | head -n 1)
+
+        if [ -z "$APP_PATH" ]; then
+          echo "Error: Could not locate compiled .app file in $GITHUB_WORKSPACE/build."
+          exit 1
+        fi
+
+        echo "Found compiled iOS app at: $APP_PATH"
+
+        echo "=== 7. Packaging IPA for Sideloadly ==="
+        rm -rf ./Payload SafariAutoRefreshXL.ipa
+        mkdir -p ./Payload
+        cp -R "$APP_PATH" ./Payload/
+        zip -r SafariAutoRefreshXL.ipa Payload
+
+    - name: Upload IPA Artifact for Sideloadly
+      uses: actions/upload-artifact@v4
+      with:
+        name: SafariAutoRefreshXL-IPA
+        path: SafariAutoRefreshXL.ipa

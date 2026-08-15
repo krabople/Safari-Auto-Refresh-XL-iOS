@@ -1,0 +1,290 @@
+// Auto Refresh XL - iOS Safari Extension Service Worker
+
+const activeTabStates = {};
+
+const DEFAULT_TAB_STATE = {
+  enabled: false,
+  mode: 'fixed',
+  interval: 10,
+  minInterval: 5,
+  maxInterval: 15,
+  nextRefreshTime: 0,
+  refreshCount: 0,
+  maxRefreshes: 0,
+  hardRefresh: false,
+  overlayEnabled: true,
+  stopOnInteraction: false,
+
+  // Page Monitoring
+  monitorEnabled: false,
+  targetText: '',
+  matchType: 'text',
+  condition: 'appears',
+  actionStop: true,
+  actionSound: true,
+  actionNotify: true,
+  actionHighlight: true,
+  actionScroll: true,
+  actionFocus: true
+};
+
+// Initialize background worker
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log('Auto Refresh XL iOS Safari Extension Installed.');
+  const data = await chrome.storage.local.get(['autoStartRules', 'globalDefaults']);
+  if (!data.autoStartRules) {
+    await chrome.storage.local.set({ autoStartRules: [] });
+  }
+  if (!data.globalDefaults) {
+    await chrome.storage.local.set({
+      globalDefaults: {
+        interval: 10,
+        mode: 'fixed',
+        minInterval: 5,
+        maxInterval: 15,
+        maxRefreshes: 0,
+        hardRefresh: false,
+        overlayEnabled: true,
+        stopOnInteraction: false
+      }
+    });
+  }
+});
+
+// Restore active timers from storage on background startup
+chrome.storage.local.get(['tabStates'], (result) => {
+  if (result.tabStates) {
+    Object.assign(activeTabStates, result.tabStates);
+  }
+});
+
+// Ticker loop every 1 second
+setInterval(async () => {
+  const now = Date.now();
+  const tabIds = Object.keys(activeTabStates);
+
+  for (const tabIdStr of tabIds) {
+    const tabId = parseInt(tabIdStr, 10);
+    const state = activeTabStates[tabId];
+
+    if (!state || !state.enabled) continue;
+
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab) {
+        delete activeTabStates[tabId];
+        saveTabStates();
+        continue;
+      }
+    } catch (e) {
+      delete activeTabStates[tabId];
+      saveTabStates();
+      continue;
+    }
+
+    if (now >= state.nextRefreshTime) {
+      await triggerTabReload(tabId, state);
+    } else {
+      const remainingSeconds = Math.max(0, Math.ceil((state.nextRefreshTime - now) / 1000));
+      sendToTab(tabId, {
+        type: 'COUNTDOWN_TICK',
+        remainingSeconds: remainingSeconds,
+        refreshCount: state.refreshCount,
+        maxRefreshes: state.maxRefreshes,
+        state: state
+      });
+    }
+  }
+
+  updateActiveTabBadge();
+}, 1000);
+
+async function triggerTabReload(tabId, state) {
+  try {
+    await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
+  } catch (err) {
+    console.error(`Failed to reload tab ${tabId}:`, err);
+  }
+
+  state.refreshCount += 1;
+
+  if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
+    state.enabled = false;
+    saveTabStates();
+
+    if (state.actionNotify) {
+      chrome.notifications.create(`limit_${tabId}_${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: 'Auto Refresh XL - Limit Reached',
+        message: `Tab completed its limit of ${state.maxRefreshes} refreshes.`,
+        priority: 2
+      });
+    }
+
+    sendToTab(tabId, { type: 'REFRESH_STOPPED', state: state });
+    updateActiveTabBadge();
+    return;
+  }
+
+  let nextIntervalSec = state.interval;
+  if (state.mode === 'random') {
+    const min = Math.min(state.minInterval, state.maxInterval);
+    const max = Math.max(state.minInterval, state.maxInterval);
+    const randFloat = Math.random() * (max - min) + min;
+    nextIntervalSec = Math.round(randFloat * 10) / 10;
+  }
+
+  state.nextRefreshTime = Date.now() + nextIntervalSec * 1000;
+  saveTabStates();
+}
+
+async function updateActiveTabBadge() {
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab || !activeTab.id) {
+      chrome.action.setBadgeText({ text: '' });
+      return;
+    }
+
+    const state = activeTabStates[activeTab.id];
+    if (state && state.enabled) {
+      const remainingSec = Math.max(0, Math.ceil((state.nextRefreshTime - Date.now()) / 1000));
+      chrome.action.setBadgeText({ text: `${remainingSec}s`, tabId: activeTab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#0EA5E9', tabId: activeTab.id });
+    } else {
+      chrome.action.setBadgeText({ text: '', tabId: activeTab.id });
+    }
+  } catch (e) {
+    // Ignore
+  }
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    const { autoStartRules } = await chrome.storage.local.get(['autoStartRules']);
+    if (autoStartRules && Array.isArray(autoStartRules)) {
+      for (const rule of autoStartRules) {
+        if (!rule.enabled || !rule.pattern) continue;
+        let match = false;
+        try {
+          const regex = new RegExp(rule.pattern.replace(/\*/g, '.*'), 'i');
+          match = regex.test(tab.url);
+        } catch (e) {
+          match = tab.url.includes(rule.pattern);
+        }
+
+        if (match && (!activeTabStates[tabId] || !activeTabStates[tabId].enabled)) {
+          const newState = Object.assign({}, DEFAULT_TAB_STATE, rule.settings || {}, {
+            enabled: true,
+            nextRefreshTime: Date.now() + ((rule.settings && rule.settings.interval) || 10) * 1000,
+            refreshCount: 0
+          });
+
+          activeTabStates[tabId] = newState;
+          saveTabStates();
+          updateActiveTabBadge();
+          break;
+        }
+      }
+    }
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (activeTabStates[tabId]) {
+    delete activeTabStates[tabId];
+    saveTabStates();
+  }
+});
+
+function saveTabStates() {
+  chrome.storage.local.set({ tabStates: activeTabStates });
+}
+
+function sendToTab(tabId, message) {
+  chrome.tabs.sendMessage(tabId, message).catch(() => {});
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const senderTabId = sender.tab ? sender.tab.id : null;
+  const targetTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
+
+  if (request.type === 'START_REFRESH') {
+    const tabId = targetTabId;
+    if (!tabId) {
+      sendResponse({ success: false });
+      return true;
+    }
+
+    const newState = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
+      enabled: true,
+      nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
+      refreshCount: request.state.refreshCount || 0
+    });
+
+    activeTabStates[tabId] = newState;
+    saveTabStates();
+    updateActiveTabBadge();
+
+    sendToTab(tabId, { type: 'REFRESH_STARTED', state: newState });
+    sendResponse({ success: true, state: newState });
+    return true;
+  }
+
+  if (request.type === 'STOP_REFRESH') {
+    const tabId = targetTabId;
+    if (tabId && activeTabStates[tabId]) {
+      activeTabStates[tabId].enabled = false;
+      saveTabStates();
+    }
+    updateActiveTabBadge();
+    if (tabId) {
+      sendToTab(tabId, { type: 'REFRESH_STOPPED' });
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.type === 'GET_TAB_STATE') {
+    const tabId = targetTabId;
+    const state = (tabId && activeTabStates[tabId]) ? activeTabStates[tabId] : Object.assign({}, DEFAULT_TAB_STATE);
+    sendResponse({ state: state });
+    return true;
+  }
+
+  if (request.type === 'TARGET_DETECTED') {
+    const tabId = targetTabId;
+    const state = tabId ? activeTabStates[tabId] : null;
+
+    if (state) {
+      if (state.actionStop) {
+        state.enabled = false;
+        saveTabStates();
+        updateActiveTabBadge();
+        sendToTab(tabId, { type: 'REFRESH_STOPPED' });
+      }
+
+      if (state.actionFocus && tabId) {
+        chrome.tabs.get(tabId, (tab) => {
+          if (tab) {
+            chrome.tabs.update(tabId, { active: true });
+          }
+        });
+      }
+
+      if (state.actionNotify) {
+        chrome.notifications.create(`target_${tabId}_${Date.now()}`, {
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'Auto Refresh XL - Target Detected!',
+          message: `Target expression "${state.targetText}" was detected on ${sender.tab ? sender.tab.title : 'webpage'}!`,
+          priority: 2
+        });
+      }
+    }
+
+    sendResponse({ success: true });
+    return true;
+  }
+});

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Auto Refresh XL</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Banner -->
+    <header class="app-header">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+          <circle cx="12" cy="12" r="4" fill="currentColor" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span class="brand-name">Auto Refresh <span class="brand-badge">XL</span></span>
+      </div>
+      <div class="header-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">IDLE</span>
+      </div>
+    </header>
+
+    <!-- Main Action Panel -->
+    <div class="action-banner">
+      <div class="countdown-display" id="countdownDisplay">--:--</div>
+      <button class="btn-primary-action" id="startStopBtn">
+        <span id="startStopText">START REFRESH</span>
+      </button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-timer">Timer</button>
+      <button class="nav-tab" data-tab="tab-monitor">Monitor</button>
+      <button class="nav-tab" data-tab="tab-autostart">Auto-Start</button>
+      <button class="nav-tab" data-tab="tab-support">Support</button>
+    </nav>
+
+    <!-- Tab Content Area -->
+    <main class="tab-content">
+      <!-- TIMER TAB -->
+      <section class="tab-pane active" id="tab-timer">
+        <!-- Preset Interval Chips -->
+        <div class="form-group">
+          <label class="form-label">Preset Intervals</label>
+          <div class="preset-chips">
+            <button class="chip" data-seconds="5">5s</button>
+            <button class="chip" data-seconds="10">10s</button>
+            <button class="chip active" data-seconds="30">30s</button>
+            <button class="chip" data-seconds="60">1m</button>
+            <button class="chip" data-seconds="300">5m</button>
+            <button class="chip" data-seconds="900">15m</button>
+          </div>
+        </div>
+
+        <!-- Custom Duration Inputs -->
+        <div class="form-group">
+          <label class="form-label">Custom Duration</label>
+          <div class="time-inputs">
+            <div class="time-field">
+              <input type="number" id="inputHours" min="0" max="24" value="0">
+              <span>Hrs</span>
+            </div>
+            <div class="time-field">
+              <input type="number" id="inputMinutes" min="0" max="59" value="0">
+              <span>Min</span>
+            </div>
+            <div class="time-field">
+              <input type="number" id="inputSeconds" min="1" max="59" value="30">
+              <span>Sec</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Random Interval Range -->
+        <div class="form-group">
+          <div class="toggle-row">
+            <label for="toggleRandom" class="toggle-label">
+              <span>Random Interval Range</span>
+              <small>Bypass anti-bot rate limits</small>
+            </label>
+            <input type="checkbox" id="toggleRandom" class="toggle-switch">
+          </div>
+          <div class="random-inputs hidden" id="randomInputs">
+            <div class="range-field">
+              <span>Min (sec):</span>
+              <input type="number" id="inputMinSec" min="1" value="5">
+            </div>
+            <div class="range-field">
+              <span>Max (sec):</span>
+              <input type="number" id="inputMaxSec" min="2" value="20">
+            </div>
+          </div>
+        </div>
+
+        <!-- Refresh Limits & Options -->
+        <div class="form-group">
+          <div class="input-row">
+            <label for="inputMaxRefreshes">Refresh Limit Count (0 = Unlimited):</label>
+            <input type="number" id="inputMaxRefreshes" min="0" value="0" style="width: 70px;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="toggle-row">
+            <label for="toggleHardRefresh" class="toggle-label">
+              <span>Hard Refresh</span>
+              <small>Bypass browser cache</small>
+            </label>
+            <input type="checkbox" id="toggleHardRefresh" class="toggle-switch">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="toggle-row">
+            <label for="toggleOverlay" class="toggle-label">
+              <span>On-Page Overlay Widget</span>
+              <small>Show draggable timer on page</small>
+            </label>
+            <input type="checkbox" id="toggleOverlay" class="toggle-switch" checked>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="toggle-row">
+            <label for="toggleStopOnInteraction" class="toggle-label">
+              <span>Stop on Touch / Interaction</span>
+              <small>Stop refresh if you tap or type on page</small>
+            </label>
+            <input type="checkbox" id="toggleStopOnInteraction" class="toggle-switch">
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE MONITOR TAB -->
+      <section class="tab-pane" id="tab-monitor">
+        <div class="form-group">
+          <div class="toggle-row">
+            <label for="toggleMonitor" class="toggle-label">
+              <span>Enable Content Monitoring</span>
+              <small>Scan page for text/regex changes</small>
+            </label>
+            <input type="checkbox" id="toggleMonitor" class="toggle-switch">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Target Text or Expression</label>
+          <input type="text" id="targetText" placeholder="e.g. In Stock, Out of Stock, Available..." class="text-input">
+        </div>
+
+        <div class="form-group flex-row">
+          <div class="flex-col">
+            <label class="form-label">Match Mode</label>
+            <select id="matchType" class="select-input">
+              <option value="text">Plain Text</option>
+              <option value="regex">Regular Expression</option>
+              <option value="xpath">XPath Selector</option>
+            </select>
+          </div>
+          <div class="flex-col">
+            <label class="form-label">Condition</label>
+            <select id="conditionType" class="select-input">
+              <option value="appears">Target Appears</option>
+              <option value="disappears">Target Disappears</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Actions When Detected</label>
+          <div class="checkbox-grid">
+            <label class="checkbox-item">
+              <input type="checkbox" id="actStop" checked>
+              <span>Stop Refresh</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="actSound" checked>
+              <span>Sound Alert</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="actNotify" checked>
+              <span>Push Notification</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="actHighlight" checked>
+              <span>Highlight Element</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="actScroll" checked>
+              <span>Auto-Scroll to Element</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="actFocus" checked>
+              <span>Focus Tab & Window</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- AUTO-START TAB -->
+      <section class="tab-pane" id="tab-autostart">
+        <div class="autostart-card">
+          <h4>Auto-Start URL Rule</h4>
+          <p>Automatically start auto-refreshing whenever you visit specific domain patterns.</p>
+          <button class="btn-secondary" id="btnAddCurrentDomain">+ Auto-Start Current Page</button>
+        </div>
+        <div class="autostart-footer">
+          <button class="btn-link" id="btnOpenOptions">Open Advanced Options & Rules &rarr;</button>
+        </div>
+      </section>
+
+      <!-- SUPPORT & DONATE TAB -->
+      <section class="tab-pane" id="tab-support">
+        <div class="support-card">
+          <div class="support-card-header">
+            <svg class="support-icon" viewBox="0 0 24 24">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+            <h4>Bug Fixes & Feedback</h4>
+          </div>
+          <p>Have suggestions for improvement or found a bug? Email directly to:</p>
+          <a href="mailto:krabople@gmail.com" id="linkEmail" class="email-badge">krabople@gmail.com</a>
+        </div>
+
+        <div class="support-card review-card">
+          <div class="support-card-header">
+            <span class="star-emoji">⭐</span>
+            <h4>Rate & Review</h4>
+          </div>
+          <p>Enjoying <strong>Auto Refresh XL</strong>? Please consider leaving a review!</p>
+          <button class="btn-secondary" id="btnReview">⭐ Leave a Review</button>
+        </div>
+
+        <div class="support-card donate-card">
+          <div class="support-card-header">
+            <span class="coffee-emoji">☕</span>
+            <h4>Support Development</h4>
+          </div>
+          <p>Enjoying <strong>Auto Refresh XL</strong>? If it saved you time or helped you out, consider supporting independent development!</p>
+          <button class="btn-donate" id="btnDonate">☕ Buy Me a Coffee</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
