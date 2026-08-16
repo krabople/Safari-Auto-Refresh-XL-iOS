@@ -197,25 +197,49 @@
       hasTriggeredTarget = true;
       stopMonitoringLoop();
 
-      triggerNativeAlert(currentTabState.targetText);
-
+      // 1. Highlight exact matching text in webpage DOM
       let highlightedEl = null;
-      if (currentTabState.actionHighlight !== false) {
-        highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
+      try {
+        if (currentTabState.actionHighlight !== false) {
+          highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
+        }
+      } catch (e) {
+        console.warn('Highlight error:', e);
       }
 
-      showTargetAlertBanner(currentTabState.targetText);
-
-      if (currentTabState.actionSound) {
-        playAlertSound();
+      // 2. Play Audio Alert Chime
+      try {
+        if (currentTabState.actionSound !== false) {
+          playAlertSound();
+        }
+      } catch (e) {
+        console.warn('Sound error:', e);
       }
 
-      const targetToScroll = highlightedEl || matchedNode;
-      if (targetToScroll && currentTabState.actionScroll !== false) {
-        targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 3. Show On-Screen Alert Banner
+      try {
+        showTargetAlertBanner(currentTabState.targetText);
+      } catch (e) {
+        console.warn('Banner error:', e);
       }
 
-      chrome.runtime.sendMessage({ type: 'TARGET_DETECTED' });
+      // 4. Auto-Scroll to Highlighted Element
+      try {
+        const targetToScroll = highlightedEl || matchedNode;
+        if (targetToScroll && currentTabState.actionScroll !== false) {
+          targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } catch (e) {}
+
+      // 5. Send message to background service worker
+      try {
+        chrome.runtime.sendMessage({ type: 'TARGET_DETECTED', targetText: currentTabState.targetText });
+      } catch (e) {}
+
+      // 6. Native Alert Dispatch
+      try {
+        triggerNativeAlert(currentTabState.targetText);
+      } catch (e) {}
 
       if (overlayShadow) {
         const statusBadge = overlayShadow.querySelector('.arp-status-badge');
@@ -256,35 +280,19 @@
       <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
         Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on this page.
       </div>
-      <div style="display: flex; gap: 8px; justify-content: center;">
-        <button id="arp-banner-sound" style="
-          background: linear-gradient(135deg, #facc15, #eab308);
-          color: #000;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-weight: 800;
-          font-size: 13px;
-          cursor: pointer;
-        ">🔊 Replay Sound</button>
-        <button id="arp-banner-dismiss" style="
-          background: linear-gradient(135deg, #00f2fe, #0284c7);
-          color: #000;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-weight: 800;
-          font-size: 13px;
-          cursor: pointer;
-        ">Dismiss Alert</button>
-      </div>
+      <button id="arp-banner-dismiss" style="
+        background: linear-gradient(135deg, #00f2fe, #0284c7);
+        color: #000;
+        border: none;
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 13px;
+        cursor: pointer;
+      ">Dismiss Alert</button>
     `;
 
     document.body.appendChild(banner);
-
-    document.getElementById('arp-banner-sound')?.addEventListener('click', () => {
-      playAlertSound();
-    });
 
     document.getElementById('arp-banner-dismiss')?.addEventListener('click', () => {
       banner.remove();
