@@ -40,13 +40,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentTabId = null;
   let activeState = null;
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab && tab.id) {
-    currentTabId = tab.id;
+  try {
+    const tabs = await chrome.tabs.query({ active: true });
+    if (tabs && tabs.length > 0) {
+      currentTabId = tabs[0].id;
+    }
+  } catch (e) {
+    console.warn('Query tabs error:', e);
   }
 
   if (currentTabId) {
     chrome.runtime.sendMessage({ type: 'GET_TAB_STATE', tabId: currentTabId }, (response) => {
+      if (response && response.state) {
+        activeState = response.state;
+        populateUI(activeState);
+      }
+    });
+  } else {
+    chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
       if (response && response.state) {
         activeState = response.state;
         populateUI(activeState);

@@ -237,29 +237,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const targetTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
 
   if (request.type === 'START_REFRESH') {
-    const tabId = targetTabId;
-    if (!tabId) {
-      sendResponse({ success: false });
-      return true;
+    const tabId = request.tabId || targetTabId;
+
+    const startExecution = (tid) => {
+      if (!tid) {
+        addLog('REFRESH', '🔴 Start Refresh Failed: No target tab ID', 'error');
+        sendResponse({ success: false });
+        return;
+      }
+      targetTabId = tid;
+      const newState = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
+        enabled: true,
+        nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
+        refreshCount: request.state.refreshCount || 0
+      });
+
+      activeTabStates[tid] = newState;
+      saveTabStates();
+      updateActiveTabBadge();
+
+      addLog('REFRESH', `Started refresh for tab ${tid} (${newState.interval || newState.minInterval}s)`);
+
+      sendToTab(tid, { type: 'REFRESH_STARTED', state: newState });
+      scheduleNextRefresh(tid);
+      sendResponse({ success: true, state: newState });
+    };
+
+    if (tabId) {
+      startExecution(tabId);
+    } else {
+      chrome.tabs.query({ active: true }, (tabs) => {
+        const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
+        startExecution(foundId);
+      });
     }
-
-    const newState = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
-      enabled: true,
-      nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
-      refreshCount: request.state.refreshCount || 0
-    });
-
-    activeTabStates[tabId] = newState;
-    saveTabStates();
-    updateActiveTabBadge();
-
-    sendToTab(tabId, { type: 'REFRESH_STARTED', state: newState });
-    sendResponse({ success: true, state: newState });
     return true;
   }
 
   if (request.type === 'STOP_REFRESH') {
-    const tabId = targetTabId;
+    const tabId = request.tabId || targetTabId;
     if (tabId && activeTabStates[tabId]) {
       activeTabStates[tabId].enabled = false;
       saveTabStates();
@@ -267,15 +283,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     updateActiveTabBadge();
     if (tabId) {
       sendToTab(tabId, { type: 'REFRESH_STOPPED' });
+      addLog('REFRESH', `Stopped refresh for tab ${tabId}`);
     }
     sendResponse({ success: true });
     return true;
   }
 
   if (request.type === 'GET_TAB_STATE') {
-    const tabId = targetTabId;
-    const state = (tabId && activeTabStates[tabId]) ? activeTabStates[tabId] : Object.assign({}, DEFAULT_TAB_STATE);
-    sendResponse({ state: state });
+    const getStateExecution = (tid) => {
+      const state = (tid && activeTabStates[tid]) ? activeTabStates[tid] : Object.assign({}, DEFAULT_TAB_STATE);
+      sendResponse({ state: state });
+    };
+
+    const reqTabId = request.tabId || targetTabId;
+    if (reqTabId) {
+      getStateExecution(reqTabId);
+    } else {
+      chrome.tabs.query({ active: true }, (tabs) => {
+        const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
+        getStateExecution(foundId);
+      });
+    }
     return true;
   }
 
