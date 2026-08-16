@@ -36,6 +36,7 @@
     <nav class="nav-tabs">
       <button class="nav-tab active" data-tab="tab-timer">Timer</button>
       <button class="nav-tab" data-tab="tab-monitor">Monitor</button>
+      <button class="nav-tab" data-tab="tab-logs">Logs</button>
       <button class="nav-tab" data-tab="tab-autostart">Auto-Start</button>
       <button class="nav-tab" data-tab="tab-support">Support</button>
     </nav>
@@ -195,6 +196,34 @@
 
         <div class="form-group">
           <button type="button" class="btn-secondary" id="btnTestSound" style="width: 100%;">🔊 Test Alert Sound</button>
+        </div>
+      <!-- LOGS TAB -->
+      <section class="tab-pane" id="tab-logs">
+        <div class="form-group">
+          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>📋 Activity & Diagnostic Log</span>
+            <button class="btn-link" id="btnClearLogs" style="font-size: 11px;">Clear Logs</button>
+          </label>
+          <div id="logConsoleContainer" style="
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            border-radius: 10px;
+            padding: 10px;
+            height: 180px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 11px;
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          ">
+            <div style="color: #64748b; font-style: italic;">No activity logged yet.</div>
+          </div>
+        </div>
+        <div class="form-group" style="display: flex; gap: 8px;">
+          <button type="button" class="btn-secondary" id="btnTestSoundLogs" style="flex: 1;">🔊 Test Sound</button>
+          <button type="button" class="btn-secondary" id="btnTestPushLogs" style="flex: 1;">📲 Test Push Alert</button>
         </div>
       </section>
 

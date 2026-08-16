@@ -321,4 +321,65 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  const logConsoleContainer = document.getElementById('logConsoleContainer');
+  const btnClearLogs = document.getElementById('btnClearLogs');
+  const btnTestSoundLogs = document.getElementById('btnTestSoundLogs');
+  const btnTestPushLogs = document.getElementById('btnTestPushLogs');
+
+  function renderLogs() {
+    if (!logConsoleContainer) return;
+    chrome.runtime.sendMessage({ type: 'GET_LOGS' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.logs) return;
+      const logs = response.logs;
+      if (logs.length === 0) {
+        logConsoleContainer.innerHTML = '<div style="color: #64748b; font-style: italic;">No activity logged yet.</div>';
+        return;
+      }
+      logConsoleContainer.innerHTML = logs.map(entry => {
+        const colorClass = entry.type === 'error' ? '#f87171' : entry.type === 'success' ? '#4ade80' : entry.type === 'warn' ? '#fbbf24' : '#38bdf8';
+        return `<div style="line-height: 1.3;"><span style="color: #64748b;">[${entry.timestamp}]</span> <strong style="color: ${colorClass};">[${entry.category}]</strong> ${escapeHTML(entry.message)}</div>`;
+      }).join('');
+      logConsoleContainer.scrollTop = logConsoleContainer.scrollHeight;
+    });
+  }
+
+  function escapeHTML(str) {
+    return (str || '').replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+  }
+
+  if (btnClearLogs) {
+    btnClearLogs.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'CLEAR_LOGS' }, () => {
+        renderLogs();
+      });
+    });
+  }
+
+  if (btnTestSoundLogs) {
+    btnTestSoundLogs.addEventListener('click', () => {
+      playPopupSound();
+      if (currentTabId) {
+        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_SOUND' }).catch(() => {});
+      }
+    });
+  }
+
+  if (btnTestPushLogs) {
+    btnTestPushLogs.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'TEST_NATIVE_ALERT' }, () => {
+        renderLogs();
+      });
+    });
+  }
+
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      if (e.target.getAttribute('data-tab') === 'tab-logs') {
+        renderLogs();
+      }
+    });
+  });
+
+  setInterval(renderLogs, 1500);
 });

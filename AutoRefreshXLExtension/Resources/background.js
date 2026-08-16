@@ -1,15 +1,30 @@
 const activeTabStates = {};
+const extensionLogs = [];
+
+function addLog(category, message, type = 'info') {
+  const timestamp = new Date().toLocaleTimeString();
+  extensionLogs.push({ timestamp, category, message, type });
+  if (extensionLogs.length > 80) extensionLogs.shift();
+  console.log(`[AutoRefreshXL] [${category}] ${message}`);
+}
+
+addLog('SYSTEM', 'Background service worker initialized');
 
 function triggerNativeAlert(targetText) {
   const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
+  addLog('NATIVE', 'Sending native message: ' + JSON.stringify(payload));
   try {
     if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
       browser.runtime.sendNativeMessage("application.id", payload);
+      addLog('NATIVE', 'browser.runtime.sendNativeMessage sent', 'success');
     } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
       chrome.runtime.sendNativeMessage("application.id", payload);
+      addLog('NATIVE', 'chrome.runtime.sendNativeMessage sent', 'success');
+    } else {
+      addLog('NATIVE', 'sendNativeMessage API unavailable', 'warn');
     }
   } catch (e) {
-    console.warn('Native message error:', e);
+    addLog('NATIVE', '🔴 Native message Exception: ' + e.message, 'error');
   }
 }
 
@@ -264,10 +279,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'GET_LOGS') {
+    sendResponse({ logs: extensionLogs });
+    return true;
+  }
+
+  if (request.type === 'CLEAR_LOGS') {
+    extensionLogs.length = 0;
+    addLog('SYSTEM', 'Logs cleared by user');
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.type === 'TEST_NATIVE_ALERT') {
+    addLog('TEST', 'User clicked Test Push Alert button in popup');
+    triggerNativeAlert('Test Alert');
+    if (chrome.notifications && chrome.notifications.create) {
+      chrome.notifications.create(`test_${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: '🎯 Auto Refresh XL - Test Push Notification',
+        message: 'Notification test successful! Alerts are working.',
+        priority: 2
+      });
+      addLog('NOTIFY', 'chrome.notifications.create dispatched for test', 'success');
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.type === 'TARGET_DETECTED') {
     const tabId = targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
     const targetTxt = (state && state.targetText) ? state.targetText : (request.targetText || 'Keyword');
+
+    addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
     triggerNativeAlert(targetTxt);
 
@@ -279,6 +325,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         message: `Target expression "${targetTxt}" was detected on webpage!`,
         priority: 2
       });
+      addLog('NOTIFY', 'chrome.notifications.create dispatched for target detection', 'success');
     }
 
     if (state) {

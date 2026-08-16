@@ -8,153 +8,8 @@
   let dragOffsetX = 0;
   let dragOffsetY = 0;
   let hasTriggeredTarget = false;
-
-  const debugLogs = [];
-
-  function logDebug(category, message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString();
-    const entry = { timestamp, category, message, type };
-    debugLogs.push(entry);
-    if (debugLogs.length > 60) debugLogs.shift();
-
-    console.log(`[AutoRefreshXL] [${category}] ${message}`);
-    renderDebugConsoleLog(entry);
-  }
-
-  function createDebugConsoleUI() {
-    if (document.getElementById('arp-debug-console-host')) return;
-
-    const host = document.createElement('div');
-    host.id = 'arp-debug-console-host';
-    host.style.cssText = `
-      position: fixed;
-      bottom: 10px;
-      left: 10px;
-      z-index: 2147483646;
-      font-family: -apple-system, BlinkMacSystemFont, monospace;
-      font-size: 11px;
-    `;
-
-    const shadow = host.attachShadow({ mode: 'open' });
-    shadow.innerHTML = `
-      <style>
-        .debug-panel {
-          background: rgba(15, 23, 42, 0.94);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          color: #e2e8f0;
-          border: 1px solid rgba(14, 165, 233, 0.4);
-          border-radius: 12px;
-          width: 310px;
-          max-height: 220px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        .debug-header {
-          background: rgba(30, 41, 59, 0.95);
-          padding: 8px 12px;
-          font-weight: 700;
-          color: #38bdf8;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          cursor: pointer;
-          user-select: none;
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .debug-body {
-          padding: 8px 12px;
-          overflow-y: auto;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-          max-height: 170px;
-        }
-        .debug-body.collapsed {
-          display: none;
-        }
-        .log-entry {
-          line-height: 1.3;
-          word-break: break-word;
-          font-family: monospace;
-          font-size: 10.5px;
-        }
-        .log-time { color: #64748b; font-size: 9.5px; }
-        .log-info { color: #38bdf8; }
-        .log-success { color: #4ade80; font-weight: 700; }
-        .log-warn { color: #fbbf24; }
-        .log-error { color: #f87171; font-weight: 700; }
-      </style>
-      <div class="debug-panel">
-        <div class="debug-header" id="header">
-          <span>📋 Auto Refresh XL Log</span>
-          <span id="toggleBtn">▼</span>
-        </div>
-        <div class="debug-body" id="body"></div>
-      </div>
-    `;
-
-    if (document.body) {
-      document.body.appendChild(host);
-    } else {
-      return;
-    }
-
-    const header = shadow.getElementById('header');
-    const body = shadow.getElementById('body');
-    const toggleBtn = shadow.getElementById('toggleBtn');
-
-    header.addEventListener('click', () => {
-      body.classList.toggle('collapsed');
-      toggleBtn.textContent = body.classList.contains('collapsed') ? '▲' : '▼';
-    });
-
-    debugLogs.forEach(entry => appendLogToShadow(shadow, entry));
-  }
-
-  function renderDebugConsoleLog(entry) {
-    if (!document.body) return;
-    let host = document.getElementById('arp-debug-console-host');
-    if (!host) {
-      createDebugConsoleUI();
-      host = document.getElementById('arp-debug-console-host');
-    }
-    if (host && host.shadowRoot) {
-      appendLogToShadow(host.shadowRoot, entry);
-    }
-  }
-
-  function appendLogToShadow(shadow, entry) {
-    const body = shadow.getElementById('body');
-    if (!body) return;
-
-    const div = document.createElement('div');
-    div.className = `log-entry log-${entry.type}`;
-    div.innerHTML = `<span class="log-time">[${entry.timestamp}]</span> <strong>[${entry.category}]</strong> ${escapeHTML(entry.message)}`;
-    body.appendChild(div);
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function triggerNativeAlert(targetText) {
-    const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
-    logDebug('NATIVE', 'Sending native message: ' + JSON.stringify(payload));
-    try {
-      if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
-        browser.runtime.sendNativeMessage("application.id", payload);
-        logDebug('NATIVE', 'browser.runtime.sendNativeMessage sent', 'success');
-      } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
-        chrome.runtime.sendNativeMessage("application.id", payload);
-        logDebug('NATIVE', 'chrome.runtime.sendNativeMessage sent', 'success');
-      } else {
-        logDebug('NATIVE', 'sendNativeMessage unavailable', 'warn');
-      }
-    } catch (e) {
-      logDebug('NATIVE', '🔴 sendNativeMessage Error: ' + e.message, 'error');
-    }
-  }
+  let monitorIntervalId = null;
+  let monitorObserver = null;
 
   let sharedAudioCtx = null;
 
@@ -174,7 +29,7 @@
     }
   }
 
-  // Unlock AudioContext on user interaction with page
+  // Unlock AudioContext on user touch
   const unlockAudioOnTouch = () => {
     getUnlockedAudioContext();
     window.removeEventListener('touchstart', unlockAudioOnTouch, true);
@@ -182,9 +37,6 @@
   };
   window.addEventListener('touchstart', unlockAudioOnTouch, { capture: true, passive: true });
   window.addEventListener('click', unlockAudioOnTouch, { capture: true, passive: true });
-
-  let monitorIntervalId = null;
-  let monitorObserver = null;
 
   chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
     if (chrome.runtime.lastError || !response || !response.state) return;
@@ -210,43 +62,45 @@
       removeOverlay();
     } else if (request.type === 'TEST_SOUND') {
       playAlertSound();
-    } else if (request.type === 'TEST_NOTIFY') {
-      showWebNotification('Auto Refresh XL', 'Notification test successful! Alerts are working.');
-    } else if (request.type === 'REQUEST_NOTIFICATION_PERMISSION') {
-      requestWebNotificationPermission();
     }
   });
-
-  function requestWebNotificationPermission() {
-    if (typeof Notification !== 'undefined') {
-      Notification.requestPermission().then((perm) => {
-        if (perm === 'granted') {
-          try {
-            new Notification('Auto Refresh XL', {
-              body: 'Web Notifications are active! You will receive alerts when target text is detected.',
-              icon: 'icons/icon128.png'
-            });
-          } catch (e) {}
-        } else {
-          alert('Notification permission state: ' + perm + '\n\nPlease enable Notifications for Safari in your iPhone Settings app.');
-        }
-      }).catch(() => {
-        alert('Please enable Web Notifications for Safari in iOS Settings.');
-      });
-    } else {
-      alert('Web Notification permission requested.');
-    }
-  }
 
   function initContentFeatures() {
     if (!currentTabState) return;
 
-    if (document.body) {
-      createDebugConsoleUI();
-      logDebug('INIT', 'Content script initialized on: ' + location.hostname);
+    if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
+      checkPageMonitoring();
+
+      if (!monitorIntervalId) {
+        monitorIntervalId = setInterval(() => {
+          if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
+            checkPageMonitoring();
+          } else {
+            stopMonitoringLoop();
+          }
+        }, 500);
+      }
+
+      if (!monitorObserver && document.body) {
+        try {
+          monitorObserver = new MutationObserver(() => {
+            if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
+              checkPageMonitoring();
+            }
+          });
+          monitorObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+        } catch (e) {}
+      }
     }
 
-    if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
+    if (currentTabState.overlayEnabled) {
+      renderFloatingOverlay();
+    }
+
+    if (currentTabState.stopOnInteraction) {
+      setupUserInteractionListener();
+    }
+  }
       checkPageMonitoring();
 
       // Continuous DOM polling loop every 500ms for dynamic JS/React rendering
