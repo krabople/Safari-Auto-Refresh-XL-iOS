@@ -9,16 +9,148 @@
   let dragOffsetY = 0;
   let hasTriggeredTarget = false;
 
+  const debugLogs = [];
+
+  function logDebug(category, message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = { timestamp, category, message, type };
+    debugLogs.push(entry);
+    if (debugLogs.length > 60) debugLogs.shift();
+
+    console.log(`[AutoRefreshXL] [${category}] ${message}`);
+    renderDebugConsoleLog(entry);
+  }
+
+  function createDebugConsoleUI() {
+    if (document.getElementById('arp-debug-console-host')) return;
+
+    const host = document.createElement('div');
+    host.id = 'arp-debug-console-host';
+    host.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      z-index: 2147483646;
+      font-family: -apple-system, BlinkMacSystemFont, monospace;
+      font-size: 11px;
+    `;
+
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `
+      <style>
+        .debug-panel {
+          background: rgba(15, 23, 42, 0.94);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: #e2e8f0;
+          border: 1px solid rgba(14, 165, 233, 0.4);
+          border-radius: 12px;
+          width: 310px;
+          max-height: 220px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        .debug-header {
+          background: rgba(30, 41, 59, 0.95);
+          padding: 8px 12px;
+          font-weight: 700;
+          color: #38bdf8;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          user-select: none;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .debug-body {
+          padding: 8px 12px;
+          overflow-y: auto;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          max-height: 170px;
+        }
+        .debug-body.collapsed {
+          display: none;
+        }
+        .log-entry {
+          line-height: 1.3;
+          word-break: break-word;
+          font-family: monospace;
+          font-size: 10.5px;
+        }
+        .log-time { color: #64748b; font-size: 9.5px; }
+        .log-info { color: #38bdf8; }
+        .log-success { color: #4ade80; font-weight: 700; }
+        .log-warn { color: #fbbf24; }
+        .log-error { color: #f87171; font-weight: 700; }
+      </style>
+      <div class="debug-panel">
+        <div class="debug-header" id="header">
+          <span>📋 Auto Refresh XL Log</span>
+          <span id="toggleBtn">▼</span>
+        </div>
+        <div class="debug-body" id="body"></div>
+      </div>
+    `;
+
+    document.body.appendChild(host);
+
+    const header = shadow.getElementById('header');
+    const body = shadow.getElementById('body');
+    const toggleBtn = shadow.getElementById('toggleBtn');
+
+    header.addEventListener('click', () => {
+      body.classList.toggle('collapsed');
+      toggleBtn.textContent = body.classList.contains('collapsed') ? '▲' : '▼';
+    });
+
+    debugLogs.forEach(entry => appendLogToShadow(shadow, entry));
+  }
+
+  function renderDebugConsoleLog(entry) {
+    if (!document.body) return;
+    let host = document.getElementById('arp-debug-console-host');
+    if (!host) {
+      createDebugConsoleUI();
+      host = document.getElementById('arp-debug-console-host');
+    }
+    if (host && host.shadowRoot) {
+      appendLogToShadow(host.shadowRoot, entry);
+    }
+  }
+
+  function appendLogToShadow(shadow, entry) {
+    const body = shadow.getElementById('body');
+    if (!body) return;
+
+    const div = document.createElement('div');
+    div.className = `log-entry log-${entry.type}`;
+    div.innerHTML = `<span class="log-time">[${entry.timestamp}]</span> <strong>[${entry.category}]</strong> ${escapeHTML(entry.message)}`;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  logDebug('INIT', 'Content script initialized on: ' + location.hostname);
+
   function triggerNativeAlert(targetText) {
     const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
+    logDebug('NATIVE', 'Sending native message: ' + JSON.stringify(payload));
     try {
       if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
         browser.runtime.sendNativeMessage("application.id", payload);
+        logDebug('NATIVE', 'browser.runtime.sendNativeMessage sent', 'success');
       } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
         chrome.runtime.sendNativeMessage("application.id", payload);
+        logDebug('NATIVE', 'chrome.runtime.sendNativeMessage sent', 'success');
+      } else {
+        logDebug('NATIVE', 'sendNativeMessage unavailable', 'warn');
       }
     } catch (e) {
-      console.warn('Native message error:', e);
+      logDebug('NATIVE', '🔴 sendNativeMessage Error: ' + e.message, 'error');
     }
   }
 
@@ -155,10 +287,21 @@
   }
 
   function checkPageMonitoring() {
-    if (!currentTabState || currentTabState.refreshCount < 1) return;
+    if (!currentTabState) {
+      return;
+    }
+    if (currentTabState.refreshCount < 1) {
+      logDebug('SCAN', 'Waiting for 1st refresh (refreshCount: ' + currentTabState.refreshCount + ')');
+      return;
+    }
 
     const target = currentTabState.targetText.trim();
-    if (!target) return;
+    if (!target) {
+      logDebug('SCAN', 'Target text is empty');
+      return;
+    }
+
+    logDebug('SCAN', 'Scanning page for target "' + target + '" (refreshCount: ' + currentTabState.refreshCount + ')');
 
     let matchedNode = null;
     let isFound = false;
@@ -169,7 +312,7 @@
         matchedNode = result.singleNodeValue;
         isFound = !!matchedNode;
       } catch (e) {
-        console.warn('Invalid XPath expression:', target);
+        logDebug('SCAN', 'Invalid XPath: ' + target, 'error');
       }
     } else if (currentTabState.matchType === 'regex') {
       try {
@@ -180,7 +323,7 @@
           matchedNode = findTextNodeMatching(regex);
         }
       } catch (e) {
-        console.warn('Invalid Regular Expression:', target);
+        logDebug('SCAN', 'Invalid Regex: ' + target, 'error');
       }
     } else {
       const bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
@@ -193,53 +336,76 @@
     const conditionMet = (currentTabState.condition === 'appears' && isFound) ||
                          (currentTabState.condition === 'disappears' && !isFound);
 
-    if (conditionMet) {
-      hasTriggeredTarget = true;
-      stopMonitoringLoop();
+    if (!conditionMet) {
+      logDebug('SCAN', 'Target condition NOT met yet (isFound: ' + isFound + ')');
+      return;
+    }
 
-      // 1. Highlight exact matching text in webpage DOM
-      let highlightedEl = null;
-      try {
-        if (currentTabState.actionHighlight !== false) {
-          highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
+    logDebug('SCAN', '🎯 TARGET CONDITION MET! Target: "' + target + '"', 'success');
+
+    hasTriggeredTarget = true;
+    stopMonitoringLoop();
+
+    // 1. Highlight exact matching text in webpage DOM
+    let highlightedEl = null;
+    try {
+      if (currentTabState.actionHighlight !== false) {
+        logDebug('HIGHLIGHT', 'Executing highlightMatchingText...');
+        highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
+        if (highlightedEl) {
+          logDebug('HIGHLIGHT', '🟢 Word highlighted successfully!', 'success');
+        } else {
+          logDebug('HIGHLIGHT', '⚠️ Word highlight returned null', 'warn');
         }
-      } catch (e) {
-        console.warn('Highlight error:', e);
       }
+    } catch (e) {
+      logDebug('HIGHLIGHT', '🔴 Highlight Error: ' + e.message, 'error');
+    }
 
-      // 2. Play Audio Alert Chime
-      try {
-        if (currentTabState.actionSound !== false) {
-          playAlertSound();
-        }
-      } catch (e) {
-        console.warn('Sound error:', e);
+    // 2. Play Audio Alert Chime
+    try {
+      if (currentTabState.actionSound !== false) {
+        logDebug('SOUND', 'Executing playAlertSound...');
+        playAlertSound();
       }
+    } catch (e) {
+      logDebug('SOUND', '🔴 Sound Error: ' + e.message, 'error');
+    }
 
-      // 3. Show On-Screen Alert Banner
-      try {
-        showTargetAlertBanner(currentTabState.targetText);
-      } catch (e) {
-        console.warn('Banner error:', e);
+    // 3. Show On-Screen Alert Banner
+    try {
+      logDebug('BANNER', 'Rendering target alert banner...');
+      showTargetAlertBanner(currentTabState.targetText);
+      logDebug('BANNER', '🟢 Alert banner rendered!', 'success');
+    } catch (e) {
+      logDebug('BANNER', '🔴 Banner Error: ' + e.message, 'error');
+    }
+
+    // 4. Auto-Scroll to Highlighted Element
+    try {
+      const targetToScroll = highlightedEl || matchedNode;
+      if (targetToScroll && currentTabState.actionScroll !== false) {
+        logDebug('SCROLL', 'Scrolling to target element...');
+        targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+    } catch (e) {}
 
-      // 4. Auto-Scroll to Highlighted Element
-      try {
-        const targetToScroll = highlightedEl || matchedNode;
-        if (targetToScroll && currentTabState.actionScroll !== false) {
-          targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      } catch (e) {}
+    // 5. Send message to background service worker
+    try {
+      logDebug('NOTIFY', 'Sending TARGET_DETECTED message to background.js...');
+      chrome.runtime.sendMessage({ type: 'TARGET_DETECTED', targetText: currentTabState.targetText }, (res) => {
+        logDebug('NOTIFY', 'Background response: ' + JSON.stringify(res), 'success');
+      });
+    } catch (e) {
+      logDebug('NOTIFY', '🔴 Background Message Error: ' + e.message, 'error');
+    }
 
-      // 5. Send message to background service worker
-      try {
-        chrome.runtime.sendMessage({ type: 'TARGET_DETECTED', targetText: currentTabState.targetText });
-      } catch (e) {}
-
-      // 6. Native Alert Dispatch
-      try {
-        triggerNativeAlert(currentTabState.targetText);
-      } catch (e) {}
+    // 6. Native Alert Dispatch
+    try {
+      triggerNativeAlert(currentTabState.targetText);
+    } catch (e) {
+      logDebug('NATIVE', '🔴 Native Alert Error: ' + e.message, 'error');
+    }
 
       if (overlayShadow) {
         const statusBadge = overlayShadow.querySelector('.arp-status-badge');
@@ -466,39 +632,52 @@
   }
 
   function playAlertSound() {
-    const playBurst = () => {
-      try {
-        const uri = getChimeAudioURI();
-        if (uri) {
-          const audio = new Audio(uri);
-          audio.play().catch(e => console.warn('Audio play error:', e));
-        }
-      } catch (e) {}
+    logDebug('SOUND', 'Attempting audio playback (HTML5 Audio + Web Audio API)...');
 
-      try {
-        const ctx = getUnlockedAudioContext();
-        if (ctx) {
-          if (ctx.state === 'suspended') {
-            ctx.resume().catch(() => {});
-          }
-          const now = ctx.currentTime;
-          const osc1 = ctx.createOscillator();
-          const gain1 = ctx.createGain();
-          osc1.type = 'sine';
-          osc1.frequency.setValueAtTime(1046.5, now);
-          gain1.gain.setValueAtTime(0.4, now);
-          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-          osc1.connect(gain1);
-          gain1.connect(ctx.destination);
-          osc1.start(now);
-          osc1.stop(now + 0.35);
-        }
-      } catch (e) {}
-    };
+    try {
+      const uri = getChimeAudioURI();
+      if (uri) {
+        const audio = new Audio(uri);
+        audio.volume = 1.0;
+        audio.play().then(() => {
+          logDebug('SOUND', '🔊 HTML5 Audio played successfully!', 'success');
+        }).catch(e => {
+          logDebug('SOUND', '🔴 HTML5 Audio.play() Error: ' + e.name + ' - ' + e.message, 'error');
+        });
+      }
+    } catch (e) {
+      logDebug('SOUND', '🔴 HTML5 Audio Exception: ' + e.message, 'error');
+    }
 
-    playBurst();
-    setTimeout(playBurst, 500);
-    setTimeout(playBurst, 1000);
+    try {
+      const ctx = getUnlockedAudioContext();
+      if (ctx) {
+        logDebug('SOUND', 'Web AudioContext state: ' + ctx.state);
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            logDebug('SOUND', 'Web AudioContext resumed', 'success');
+          }).catch(e => {
+            logDebug('SOUND', '🔴 AudioContext resume Error: ' + e.message, 'error');
+          });
+        }
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(1046.5, now);
+        gain1.gain.setValueAtTime(0.4, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+        logDebug('SOUND', '🔊 Web Audio Oscillator tone triggered!', 'success');
+      } else {
+        logDebug('SOUND', '⚠️ Web AudioContext unavailable', 'warn');
+      }
+    } catch (e) {
+      logDebug('SOUND', '🔴 Web Audio Exception: ' + e.message, 'error');
+    }
   }
 
   function showWebNotification(title, message) {
