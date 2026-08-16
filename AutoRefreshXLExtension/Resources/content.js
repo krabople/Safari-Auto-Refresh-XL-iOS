@@ -197,15 +197,17 @@
       hasTriggeredTarget = true;
       stopMonitoringLoop();
 
-      showTargetAlertBanner(currentTabState.targetText);
-
-      if (currentTabState.actionSound) {
-        playAlertSound();
-      }
+      triggerNativeAlert(currentTabState.targetText);
 
       let highlightedEl = null;
       if (currentTabState.actionHighlight !== false) {
         highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
+      }
+
+      showTargetAlertBanner(currentTabState.targetText);
+
+      if (currentTabState.actionSound) {
+        playAlertSound();
       }
 
       const targetToScroll = highlightedEl || matchedNode;
@@ -309,8 +311,11 @@
           }
           const parent = node.parentElement;
           if (!parent) return NodeFilter.FILTER_REJECT;
+          if (parent.closest('#arp-target-alert-banner') || parent.closest('#arp-floating-overlay-host') || parent.closest('.arp-exact-word-highlight')) {
+            return NodeFilter.FILTER_REJECT;
+          }
           const tag = parent.tagName.toLowerCase();
-          if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || parent.id === 'arp-target-alert-banner' || parent.classList.contains('arp-exact-word-highlight')) {
+          if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || tag === 'mark') {
             return NodeFilter.FILTER_REJECT;
           }
           return NodeFilter.FILTER_ACCEPT;

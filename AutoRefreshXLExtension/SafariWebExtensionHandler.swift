@@ -3,9 +3,10 @@ import AudioToolbox
 import UserNotifications
 import os.log
 
-class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
+class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNotificationCenterDelegate {
 
     func beginRequest(with context: NSExtensionContext) {
+        UNUserNotificationCenter.current().delegate = self
         let item = context.inputItems[0] as! NSExtensionItem
         let message = item.userInfo?[SFExtensionMessageKey] as? [String: Any]
 
@@ -43,5 +44,13 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         let response = NSExtensionItem()
         response.userInfo = [ SFExtensionMessageKey: [ "status": "success" ] ]
         context.completeRequest(returningItems: [response], completionHandler: nil)
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .list, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
     }
 }
