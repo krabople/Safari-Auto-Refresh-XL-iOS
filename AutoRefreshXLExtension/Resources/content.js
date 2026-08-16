@@ -97,7 +97,11 @@
       </div>
     `;
 
-    document.body.appendChild(host);
+    if (document.body) {
+      document.body.appendChild(host);
+    } else {
+      return;
+    }
 
     const header = shadow.getElementById('header');
     const body = shadow.getElementById('body');
@@ -133,8 +137,6 @@
     body.appendChild(div);
     body.scrollTop = body.scrollHeight;
   }
-
-  logDebug('INIT', 'Content script initialized on: ' + location.hostname);
 
   function triggerNativeAlert(targetText) {
     const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
@@ -238,6 +240,11 @@
 
   function initContentFeatures() {
     if (!currentTabState) return;
+
+    if (document.body) {
+      createDebugConsoleUI();
+      logDebug('INIT', 'Content script initialized on: ' + location.hostname);
+    }
 
     if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
       checkPageMonitoring();
