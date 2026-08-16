@@ -14,28 +14,32 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNot
 
         if let msg = message, let type = msg["type"] as? String {
             if type == "TARGET_DETECTED" || type == "PLAY_SOUND" || type == "SHOW_NOTIFICATION" {
-                // 1. Play Native iOS System Sound & Haptic Vibration on Physical Device
-                AudioServicesPlayAlertSound(1005) // Standard iOS Alert Chime
+                // 1. Play Physical iOS System Sound & Haptic Vibration
+                AudioServicesPlaySystemSound(1005) // Standard iOS System Alert Sound
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
 
-                // 2. Post Native iOS Push Notification Banner
-                let content = UNMutableNotificationContent()
-                content.title = "🎯 Auto Refresh XL - Target Detected!"
-                if let targetText = msg["targetText"] as? String, !targetText.isEmpty {
-                    content.body = "Matched target: \"\(targetText)\" on your webpage!"
-                } else {
-                    content.body = "Target keyword was detected on your webpage!"
-                }
-                content.sound = UNNotificationSound.default
+                // 2. Request Notification Authorization & Post Local Notification Banner
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+                    let content = UNMutableNotificationContent()
+                    content.title = "🎯 Auto Refresh XL - Target Detected!"
+                    if let targetText = msg["targetText"] as? String, !targetText.isEmpty {
+                        content.body = "Matched target: \"\(targetText)\" on your webpage!"
+                    } else {
+                        content.body = "Target keyword was detected on your webpage!"
+                    }
+                    content.sound = UNNotificationSound.default
 
-                let request = UNNotificationRequest(
-                    identifier: "target_\(Date().timeIntervalSince1970)",
-                    content: content,
-                    trigger: nil
-                )
-                UNUserNotificationCenter.current().add(request) { error in
-                    if let error = error {
-                        os_log(.error, "Error posting UNNotification: %@", error.localizedDescription)
+                    let request = UNNotificationRequest(
+                        identifier: "target_\(Date().timeIntervalSince1970)",
+                        content: content,
+                        trigger: nil
+                    )
+                    UNUserNotificationCenter.current().add(request) { err in
+                        if let err = err {
+                            os_log(.error, "Error posting UNNotification: %@", err.localizedDescription)
+                        } else {
+                            os_log(.default, "Successfully posted UNNotification banner")
+                        }
                     }
                 }
             }

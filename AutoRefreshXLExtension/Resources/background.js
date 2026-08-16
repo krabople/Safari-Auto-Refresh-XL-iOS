@@ -234,37 +234,33 @@ function sendToTab(tabId, message) {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const senderTabId = sender.tab ? sender.tab.id : null;
-  const targetTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
+  let resolvedTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
 
   if (request.type === 'START_REFRESH') {
-    const tabId = request.tabId || targetTabId;
-
     const startExecution = (tid) => {
       if (!tid) {
         addLog('REFRESH', '🔴 Start Refresh Failed: No target tab ID', 'error');
         sendResponse({ success: false });
         return;
       }
-      targetTabId = tid;
-      const newState = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
+      activeTabStates[tid] = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
         enabled: true,
         nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
         refreshCount: request.state.refreshCount || 0
       });
 
-      activeTabStates[tid] = newState;
       saveTabStates();
       updateActiveTabBadge();
 
-      addLog('REFRESH', `Started refresh for tab ${tid} (${newState.interval || newState.minInterval}s)`);
+      addLog('REFRESH', `Started refresh for tab ${tid} (${activeTabStates[tid].interval || activeTabStates[tid].minInterval}s)`);
 
-      sendToTab(tid, { type: 'REFRESH_STARTED', state: newState });
+      sendToTab(tid, { type: 'REFRESH_STARTED', state: activeTabStates[tid] });
       scheduleNextRefresh(tid);
-      sendResponse({ success: true, state: newState });
+      sendResponse({ success: true, state: activeTabStates[tid] });
     };
 
-    if (tabId) {
-      startExecution(tabId);
+    if (resolvedTabId) {
+      startExecution(resolvedTabId);
     } else {
       chrome.tabs.query({ active: true }, (tabs) => {
         const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
