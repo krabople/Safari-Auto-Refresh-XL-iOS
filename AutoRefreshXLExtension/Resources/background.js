@@ -95,19 +95,6 @@ setInterval(async () => {
 
     if (!state || !state.enabled) continue;
 
-    try {
-      const tab = await chrome.tabs.get(tabId);
-      if (!tab) {
-        delete activeTabStates[tabId];
-        saveTabStates();
-        continue;
-      }
-    } catch (e) {
-      delete activeTabStates[tabId];
-      saveTabStates();
-      continue;
-    }
-
     if (now >= state.nextRefreshTime) {
       await triggerTabReload(tabId, state);
     } else {

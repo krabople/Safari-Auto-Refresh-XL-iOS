@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  if (targetText && toggleMonitor) {
+    targetText.addEventListener('input', () => {
+      toggleMonitor.checked = targetText.value.trim().length > 0;
+    });
+  }
+
   function populateUI(state) {
     const intervalSec = state.interval || 30;
     inputHours.value = Math.floor(intervalSec / 3600);
@@ -120,8 +126,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       chip.classList.toggle('active', parseInt(chip.dataset.seconds, 10) === intervalSec);
     });
 
-    toggleMonitor.checked = !!state.monitorEnabled;
     targetText.value = state.targetText || '';
+    toggleMonitor.checked = !!state.monitorEnabled || (targetText.value.trim().length > 0);
     matchType.value = state.matchType || 'text';
     conditionType.value = state.condition || 'appears';
     actStop.checked = state.actionStop !== false;
