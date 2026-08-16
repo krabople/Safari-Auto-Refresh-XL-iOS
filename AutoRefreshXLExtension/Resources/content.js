@@ -71,6 +71,10 @@
   function initContentFeatures() {
     if (!currentTabState) return;
 
+    if (currentTabState.overlayEnabled !== false && !overlayElement) {
+      renderFloatingOverlay();
+    }
+
     if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
       checkPageMonitoring();
 
@@ -152,10 +156,6 @@
 
   function checkPageMonitoring() {
     if (!currentTabState) {
-      return;
-    }
-    if (currentTabState.refreshCount < 1) {
-      logDebug('SCAN', 'Waiting for 1st refresh (refreshCount: ' + currentTabState.refreshCount + ')');
       return;
     }
 

@@ -208,11 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         actionFocus: false
       };
 
-      chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (res) => {
-        if (!res || !res.success) {
-          updateActiveStatus(false);
-        }
-      });
+      chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload });
     }
   });
 
