@@ -203,12 +203,14 @@
         playAlertSound();
       }
 
-      if (matchedNode && currentTabState.actionHighlight) {
-        highlightNode(matchedNode);
+      let highlightedEl = null;
+      if (currentTabState.actionHighlight !== false) {
+        highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
       }
 
-      if (matchedNode && currentTabState.actionScroll) {
-        matchedNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const targetToScroll = highlightedEl || matchedNode;
+      if (targetToScroll && currentTabState.actionScroll !== false) {
+        targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
 
       chrome.runtime.sendMessage({ type: 'TARGET_DETECTED' });
@@ -279,23 +281,119 @@
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  function highlightMatchingText(targetText, matchType) {
+    if (!targetText || !document.body) return null;
+
+    let regex;
+    try {
+      if (matchType === 'regex') {
+        regex = new RegExp(targetText, 'gi');
+      } else if (matchType === 'xpath') {
+        return null;
+      } else {
+        regex = new RegExp(escapeRegExp(targetText), 'gi');
+      }
+    } catch (e) {
+      return null;
+    }
+
+    injectHighlightStyles();
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function (node) {
+          if (!node.nodeValue || !regex.test(node.nodeValue)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          const tag = parent.tagName.toLowerCase();
+          if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || parent.id === 'arp-target-alert-banner' || parent.classList.contains('arp-exact-word-highlight')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
+      false
+    );
+
+    const matchingTextNodes = [];
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+      matchingTextNodes.push(textNode);
+    }
+
+    let firstHighlightedEl = null;
+
+    matchingTextNodes.forEach(tNode => {
+      const parent = tNode.parentElement;
+      if (!parent) return;
+
+      const text = tNode.nodeValue;
+      regex.lastIndex = 0;
+      const match = regex.exec(text);
+      if (!match) return;
+
+      const matchedStr = match[0];
+      const matchIndex = match.index;
+
+      const beforeText = text.substring(0, matchIndex);
+      const afterText = text.substring(matchIndex + matchedStr.length);
+
+      const mark = document.createElement('mark');
+      mark.className = 'arp-exact-word-highlight';
+      mark.style.cssText = `
+        background: #facc15 !important;
+        color: #000000 !important;
+        font-weight: 900 !important;
+        padding: 2px 6px !important;
+        border-radius: 4px !important;
+        box-shadow: 0 0 12px #facc15, 0 0 4px #000 !important;
+        outline: 2px solid #eab308 !important;
+        display: inline-block !important;
+        animation: arpHighlightPulse 1.2s infinite alternate !important;
+      `;
+      mark.textContent = matchedStr;
+
+      const frag = document.createDocumentFragment();
+      if (beforeText) frag.appendChild(document.createTextNode(beforeText));
+      frag.appendChild(mark);
+      if (afterText) frag.appendChild(document.createTextNode(afterText));
+
+      parent.replaceChild(frag, tNode);
+
+      if (!firstHighlightedEl) {
+        firstHighlightedEl = mark;
+      }
+    });
+
+    return firstHighlightedEl;
+  }
+
+  function injectHighlightStyles() {
+    if (document.getElementById('arp-highlight-style')) return;
+    const style = document.createElement('style');
+    style.id = 'arp-highlight-style';
+    style.textContent = `
+      @keyframes arpHighlightPulse {
+        0% { transform: scale(1); box-shadow: 0 0 8px #facc15; }
+        100% { transform: scale(1.1); box-shadow: 0 0 18px #facc15, 0 0 6px #eab308; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function findTextNodeMatching(regex) {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
-      if (regex.test(node.nodeValue) && node.parentElement && node.parentElement.offsetWidth > 0) {
+      if (regex.test(node.nodeValue) && node.parentElement) {
         return node.parentElement;
       }
     }
     return null;
-  }
-
-  function highlightNode(element) {
-    if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
-    element.classList.add('arp-highlight-target');
-    element.style.outline = '3px solid #0EA5E9';
-    element.style.backgroundColor = 'rgba(14, 165, 233, 0.25)';
-    element.style.transition = 'all 0.3s ease';
   }
 
   function getChimeAudioURI() {
