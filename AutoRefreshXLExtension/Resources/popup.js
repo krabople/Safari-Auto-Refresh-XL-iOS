@@ -151,7 +151,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   startStopBtn.addEventListener('click', () => {
-    playPopupSound();
     const isActive = statusDot.classList.contains('active');
 
     if (isActive) {

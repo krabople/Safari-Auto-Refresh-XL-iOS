@@ -10,7 +10,8 @@
     "tabs",
     "activeTab",
     "notifications",
-    "scripting"
+    "scripting",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -13,9 +13,9 @@
     const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };
     try {
       if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
-        browser.runtime.sendNativeMessage(payload);
+        browser.runtime.sendNativeMessage("application.id", payload);
       } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
-        chrome.runtime.sendNativeMessage(payload);
+        chrome.runtime.sendNativeMessage("application.id", payload);
       }
     } catch (e) {
       console.warn('Native message error:', e);
