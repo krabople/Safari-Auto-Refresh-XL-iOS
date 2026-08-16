@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         condition: conditionType.value,
         actionStop: actStop ? actStop.checked : true,
         actionSound: actSound ? actSound.checked : true,
-        actionNotify: false,
+        actionNotify: true,
         actionHighlight: actHighlight ? actHighlight.checked : true,
         actionScroll: actScroll ? actScroll.checked : true,
         actionFocus: false

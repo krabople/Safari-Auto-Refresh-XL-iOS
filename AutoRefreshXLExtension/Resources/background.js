@@ -267,8 +267,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'TARGET_DETECTED') {
     const tabId = targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
+    const targetTxt = (state && state.targetText) ? state.targetText : (request.targetText || 'Keyword');
 
-    triggerNativeAlert(state ? state.targetText : '');
+    triggerNativeAlert(targetTxt);
+
+    if (chrome.notifications && chrome.notifications.create) {
+      chrome.notifications.create(`target_${tabId || 'tab'}_${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: '🎯 Auto Refresh XL - Target Detected!',
+        message: `Target expression "${targetTxt}" was detected on webpage!`,
+        priority: 2
+      });
+    }
 
     if (state) {
       if (state.actionStop) {
@@ -283,16 +294,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (tab) {
             chrome.tabs.update(tabId, { active: true });
           }
-        });
-      }
-
-      if (state.actionNotify) {
-        chrome.notifications.create(`target_${tabId}_${Date.now()}`, {
-          type: 'basic',
-          iconUrl: 'icons/icon128.png',
-          title: 'Auto Refresh XL - Target Detected!',
-          message: `Target expression "${state.targetText}" was detected on ${sender.tab ? sender.tab.title : 'webpage'}!`,
-          priority: 2
         });
       }
     }

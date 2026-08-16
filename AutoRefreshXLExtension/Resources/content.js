@@ -256,19 +256,35 @@
       <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
         Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on this page.
       </div>
-      <button id="arp-banner-dismiss" style="
-        background: linear-gradient(135deg, #00f2fe, #0284c7);
-        color: #000;
-        border: none;
-        padding: 8px 18px;
-        border-radius: 8px;
-        font-weight: 800;
-        font-size: 13px;
-        cursor: pointer;
-      ">Dismiss Alert</button>
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button id="arp-banner-sound" style="
+          background: linear-gradient(135deg, #facc15, #eab308);
+          color: #000;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-weight: 800;
+          font-size: 13px;
+          cursor: pointer;
+        ">🔊 Replay Sound</button>
+        <button id="arp-banner-dismiss" style="
+          background: linear-gradient(135deg, #00f2fe, #0284c7);
+          color: #000;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-weight: 800;
+          font-size: 13px;
+          cursor: pointer;
+        ">Dismiss Alert</button>
+      </div>
     `;
 
     document.body.appendChild(banner);
+
+    document.getElementById('arp-banner-sound')?.addEventListener('click', () => {
+      playAlertSound();
+    });
 
     document.getElementById('arp-banner-dismiss')?.addEventListener('click', () => {
       banner.remove();
