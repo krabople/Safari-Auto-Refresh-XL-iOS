@@ -165,14 +165,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isActive = statusDot.classList.contains('active');
 
     if (isActive) {
-      chrome.runtime.sendMessage({ type: 'STOP_REFRESH', tabId: currentTabId }, () => {
-        updateActiveStatus(false);
-      });
+      updateActiveStatus(false);
+      chrome.runtime.sendMessage({ type: 'STOP_REFRESH', tabId: currentTabId });
     } else {
+      updateActiveStatus(true);
       const intervalSec = getSelectedIntervalSeconds();
       const isRandom = toggleRandom.checked;
       const minSec = parseInt(inputMinSec.value, 10) || 5;
       const maxSec = parseInt(inputMaxSec.value, 10) || 15;
+
+      const hasTarget = targetText && targetText.value.trim().length > 0;
+      if (hasTarget && toggleMonitor) {
+        toggleMonitor.checked = true;
+      }
 
       const statePayload = {
         enabled: true,
@@ -185,10 +190,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlayEnabled: toggleOverlay.checked,
         stopOnInteraction: toggleStopOnInteraction.checked,
 
-        monitorEnabled: toggleMonitor.checked,
-        targetText: targetText.value.trim(),
-        matchType: matchType.value,
-        condition: conditionType.value,
+        monitorEnabled: (toggleMonitor && toggleMonitor.checked) || hasTarget,
+        targetText: targetText ? targetText.value.trim() : '',
+        matchType: matchType ? matchType.value : 'text',
+        condition: conditionType ? conditionType.value : 'appears',
         actionStop: actStop ? actStop.checked : true,
         actionSound: actSound ? actSound.checked : true,
         actionNotify: true,
@@ -198,8 +203,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
 
       chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (res) => {
-        if (res && res.success) {
-          updateActiveStatus(true);
+        if (!res || !res.success) {
+          updateActiveStatus(false);
         }
       });
     }

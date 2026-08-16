@@ -50,6 +50,9 @@
   chrome.runtime.onMessage.addListener((request) => {
     if (request.type === 'COUNTDOWN_TICK') {
       currentTabState = request.state;
+      if (currentTabState && currentTabState.overlayEnabled && !overlayElement) {
+        renderFloatingOverlay();
+      }
       updateOverlayCountdown(request.remainingSeconds, request.refreshCount, request.maxRefreshes);
     } else if (request.type === 'REFRESH_STARTED') {
       currentTabState = request.state;
