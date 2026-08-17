@@ -10,6 +10,7 @@
   let hasTriggeredTarget = false;
   let monitorIntervalId = null;
   let monitorObserver = null;
+  let monitorCheckTimer = null;
 
   let sharedAudioCtx = null;
 
@@ -58,10 +59,14 @@
         renderFloatingOverlay();
       }
       updateOverlayCountdown(request.remainingSeconds, request.refreshCount, request.maxRefreshes);
+      initContentFeatures();
     } else if (request.type === 'REFRESH_STARTED') {
       currentTabState = request.state;
       hasTriggeredTarget = false;
       getUnlockedAudioContext();
+      initContentFeatures();
+    } else if (request.type === 'STATE_SYNC') {
+      currentTabState = request.state;
       initContentFeatures();
     } else if (request.type === 'REFRESH_STOPPED') {
       if (currentTabState) currentTabState.enabled = false;
@@ -94,11 +99,7 @@
 
       if (!monitorObserver && document.body) {
         try {
-          monitorObserver = new MutationObserver(() => {
-            if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
-              checkPageMonitoring();
-            }
-          });
+          monitorObserver = new MutationObserver(queueMonitoringCheck);
           monitorObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
         } catch (e) {}
       }
@@ -118,6 +119,20 @@
       monitorObserver.disconnect();
       monitorObserver = null;
     }
+    if (monitorCheckTimer) {
+      clearTimeout(monitorCheckTimer);
+      monitorCheckTimer = null;
+    }
+  }
+
+  function queueMonitoringCheck() {
+    if (monitorCheckTimer || hasTriggeredTarget) return;
+    monitorCheckTimer = setTimeout(() => {
+      monitorCheckTimer = null;
+      if (currentTabState && currentTabState.monitorEnabled && !hasTriggeredTarget) {
+        checkPageMonitoring();
+      }
+    }, 100);
   }
 
   function checkPageMonitoring() {
@@ -125,7 +140,7 @@
       return;
     }
 
-    const target = currentTabState.targetText.trim();
+    const target = String(currentTabState.targetText || '').trim();
     if (!target) {
       logDebug('SCAN', 'Target text is empty');
       return;
@@ -147,7 +162,7 @@
     } else if (currentTabState.matchType === 'regex') {
       try {
         const regex = new RegExp(target, 'i');
-        const bodyText = document.body ? (document.body.innerText + ' ' + document.body.textContent) : (document.documentElement ? document.documentElement.textContent : '');
+        const bodyText = getPageText();
         isFound = regex.test(bodyText);
         if (isFound) {
           matchedNode = findTextNodeMatching(regex);
@@ -156,7 +171,7 @@
         logDebug('SCAN', 'Invalid Regex: ' + target, 'error');
       }
     } else {
-      const bodyText = document.body ? (document.body.innerText + ' ' + document.body.textContent) : (document.documentElement ? document.documentElement.textContent : '');
+      const bodyText = getPageText();
       isFound = bodyText.toLowerCase().includes(target.toLowerCase());
       if (isFound) {
         matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'));
@@ -287,6 +302,12 @@
     });
   }
 
+  function getPageText() {
+    const root = document.body || document.documentElement;
+    if (!root) return '';
+    return `${root.innerText || ''} ${root.textContent || ''}`;
+  }
+
   function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
   }
@@ -318,6 +339,7 @@
       NodeFilter.SHOW_TEXT,
       {
         acceptNode: function (node) {
+          regex.lastIndex = 0;
           if (!node.nodeValue || !regex.test(node.nodeValue)) {
             return NodeFilter.FILTER_REJECT;
           }
@@ -406,6 +428,7 @@
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
+      regex.lastIndex = 0;
       if (regex.test(node.nodeValue) && node.parentElement) {
         return node.parentElement;
       }

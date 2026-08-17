@@ -1,6 +1,7 @@
 const activeTabStates = {};
 const extensionLogs = [];
 let targetTabId = null;
+let tabStatesLoaded = false;
 
 function addLog(category, message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -26,7 +27,9 @@ function scheduleNextRefresh(tabId) {
   saveTabStates();
 
   if (chrome.alarms) {
-    chrome.alarms.create(`refresh_tab_${tabId}`, { delayInMinutes: intervalSec / 60 });
+    // Alarms are a recovery mechanism when iOS suspends the service worker.
+    // The one-second ticker below remains the precise timer while Safari is active.
+    chrome.alarms.create(`refresh_tab_${tabId}`, { when: state.nextRefreshTime });
   }
 }
 
@@ -35,9 +38,10 @@ if (chrome.alarms && chrome.alarms.onAlarm) {
     if (alarm.name.startsWith('refresh_tab_')) {
       const tabId = parseInt(alarm.name.replace('refresh_tab_', ''), 10);
       const state = activeTabStates[tabId];
-      if (state && state.enabled) {
-        await triggerTabReload(tabId, state);
-        scheduleNextRefresh(tabId);
+      // A stale alarm can fire after the foreground ticker has already
+      // refreshed and scheduled the next cycle. Do not reload twice.
+      if (state && state.enabled && Date.now() >= state.nextRefreshTime - 750) {
+        await runRefreshCycle(tabId, state);
       }
     }
   });
@@ -110,15 +114,32 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-// Restore active timers from storage on background startup
-chrome.storage.local.get(['tabStates'], (result) => {
+// Restore state before answering a content script. On iOS the worker may be
+// recreated for every navigation, so replying with the default state here
+// makes the overlay and monitor disappear after reloads.
+const tabStatesReady = chrome.storage.local.get(['tabStates']).then((result) => {
   if (result.tabStates) {
     Object.assign(activeTabStates, result.tabStates);
   }
+  tabStatesLoaded = true;
+
+  for (const [tabId, state] of Object.entries(activeTabStates)) {
+    if (state && state.enabled) {
+      if (!state.nextRefreshTime || state.nextRefreshTime <= Date.now()) {
+        state.nextRefreshTime = Date.now() + 1000;
+      }
+      scheduleNextRefresh(Number(tabId));
+    }
+  }
+}).catch((error) => {
+  tabStatesLoaded = true;
+  addLog('SYSTEM', `Could not restore saved tab states: ${error.message}`, 'error');
 });
 
-// Ticker loop every 1 second for countdown UI ticks only
-setInterval(() => {
+// Precise foreground timer and countdown UI. The alarm above takes over if
+// iOS suspends this worker; keeping both avoids a zero countdown that never
+// reloads on browsers that delay short alarms.
+setInterval(async () => {
   const now = Date.now();
   const tabIds = Object.keys(activeTabStates);
 
@@ -127,6 +148,11 @@ setInterval(() => {
     const state = activeTabStates[tabId];
 
     if (!state || !state.enabled) continue;
+
+    if (now >= state.nextRefreshTime) {
+      await runRefreshCycle(tabId, state);
+      continue;
+    }
 
     const remainingSeconds = Math.max(0, Math.ceil((state.nextRefreshTime - now) / 1000));
     sendToTab(tabId, {
@@ -141,11 +167,17 @@ setInterval(() => {
   updateActiveTabBadge();
 }, 1000);
 
-async function triggerTabReload(tabId, state) {
+async function runRefreshCycle(tabId, state) {
+  if (!state || !state.enabled) return;
+
+  // Immediately schedule next refresh cycle so countdown never locks at 00:00
+  scheduleNextRefresh(tabId);
+
   try {
     await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
+    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount + 1})`, 'success');
   } catch (err) {
-    console.error(`Failed to reload tab ${tabId}:`, err);
+    addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
   }
 
   state.refreshCount += 1;
@@ -153,6 +185,7 @@ async function triggerTabReload(tabId, state) {
   if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
     state.enabled = false;
     saveTabStates();
+    if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
 
     if (state.actionNotify) {
       chrome.notifications.create(`limit_${tabId}_${Date.now()}`, {
@@ -166,19 +199,7 @@ async function triggerTabReload(tabId, state) {
 
     sendToTab(tabId, { type: 'REFRESH_STOPPED', state: state });
     updateActiveTabBadge();
-    return;
   }
-
-  let nextIntervalSec = state.interval;
-  if (state.mode === 'random') {
-    const min = Math.min(state.minInterval, state.maxInterval);
-    const max = Math.max(state.minInterval, state.maxInterval);
-    const randFloat = Math.random() * (max - min) + min;
-    nextIntervalSec = Math.round(randFloat * 10) / 10;
-  }
-
-  state.nextRefreshTime = Date.now() + nextIntervalSec * 1000;
-  saveTabStates();
 }
 
 async function updateActiveTabBadge() {
@@ -225,6 +246,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
           activeTabStates[tabId] = newState;
           saveTabStates();
+          scheduleNextRefresh(tabId);
+          sendToTab(tabId, { type: 'STATE_SYNC', state: newState });
           updateActiveTabBadge();
           break;
         }
@@ -238,14 +261,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     delete activeTabStates[tabId];
     saveTabStates();
   }
+  if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
 });
 
 function saveTabStates() {
   chrome.storage.local.set({ tabStates: activeTabStates });
 }
 
-function sendToTab(tabId, message) {
-  chrome.tabs.sendMessage(tabId, message).catch(() => {});
+async function sendToTab(tabId, message) {
+  try {
+    await chrome.tabs.sendMessage(tabId, message);
+    return true;
+  } catch (error) {
+    addLog('PAGE', `Could not deliver ${message.type} to tab ${tabId}: ${error.message}`, 'warn');
+    return false;
+  }
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -253,7 +283,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   let resolvedTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
 
   if (request.type === 'START_REFRESH') {
-    const startExecution = (tid) => {
+    const startExecution = async (tid) => {
       if (!tid) {
         addLog('REFRESH', '🔴 Start Refresh Failed: No target tab ID', 'error');
         sendResponse({ success: false });
@@ -267,31 +297,44 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       saveTabStates();
       updateActiveTabBadge();
+      targetTabId = tid;
 
       addLog('REFRESH', `Started refresh for tab ${tid} (${activeTabStates[tid].interval || activeTabStates[tid].minInterval}s)`);
 
-      sendToTab(tid, { type: 'REFRESH_STARTED', state: activeTabStates[tid] });
       scheduleNextRefresh(tid);
-      sendResponse({ success: true, state: activeTabStates[tid] });
+      const pageReady = await sendToTab(tid, { type: 'REFRESH_STARTED', state: activeTabStates[tid] });
+      sendResponse({ success: true, pageReady, state: activeTabStates[tid] });
     };
 
-    if (resolvedTabId) {
-      startExecution(resolvedTabId);
-    } else {
-      chrome.tabs.query({ active: true }, (tabs) => {
+    const beginStart = () => {
+      if (resolvedTabId) {
+        startExecution(resolvedTabId);
+      } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
         startExecution(foundId);
+        });
+      }
+    };
+
+    if (tabStatesLoaded) {
+      beginStart();
+    } else {
+      tabStatesReady.then(beginStart).catch(() => {
+        sendResponse({ success: false });
       });
     }
     return true;
   }
 
   if (request.type === 'STOP_REFRESH') {
-    const tabId = request.tabId || targetTabId;
+    const tabId = request.tabId || senderTabId || targetTabId;
     if (tabId && activeTabStates[tabId]) {
       activeTabStates[tabId].enabled = false;
+      activeTabStates[tabId].isRefreshing = false;
       saveTabStates();
     }
+    if (chrome.alarms && tabId) chrome.alarms.clear(`refresh_tab_${tabId}`);
     updateActiveTabBadge();
     if (tabId) {
       sendToTab(tabId, { type: 'REFRESH_STOPPED' });
@@ -308,10 +351,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
 
     const reqTabId = request.tabId || senderTabId || targetTabId;
+    if (!tabStatesLoaded) {
+      tabStatesReady.then(() => getStateExecution(reqTabId));
+      return true;
+    }
     if (reqTabId) {
       getStateExecution(reqTabId);
     } else {
-      chrome.tabs.query({ active: true }, (tabs) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
         getStateExecution(foundId);
       });
@@ -355,9 +402,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
-    triggerNativeAlert(targetTxt);
+    if (!state || state.actionNotify !== false) {
+      triggerNativeAlert(targetTxt);
+    }
 
-    if (chrome.notifications && chrome.notifications.create) {
+    if ((!state || state.actionNotify !== false) && chrome.notifications && chrome.notifications.create) {
       chrome.notifications.create(`target_${tabId || 'tab'}_${Date.now()}`, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',

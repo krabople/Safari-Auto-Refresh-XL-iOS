@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeState = null;
 
   try {
-    const tabs = await chrome.tabs.query({ active: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs && tabs.length > 0) {
       currentTabId = tabs[0].id;
     }
@@ -208,7 +208,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         actionFocus: false
       };
 
-      chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload });
+      chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (response) => {
+        if (chrome.runtime.lastError || !response || !response.success) {
+          updateActiveStatus(false);
+          alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
+        } else if (!response.pageReady) {
+          alert('The refresh timer started, but Safari has not injected the page controls yet. Reload this webpage once, then start again so the overlay and monitor can attach.');
+        }
+      });
     }
   });
 
@@ -230,7 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnAddCurrentDomain.addEventListener('click', async () => {
-    const tabs = await chrome.tabs.query({ active: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const currentTab = (tabs && tabs[0]) ? tabs[0] : null;
     if (!currentTab || !currentTab.url) return;
     try {
