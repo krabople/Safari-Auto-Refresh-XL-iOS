@@ -5,6 +5,11 @@ import os.log
 
 class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNotificationCenterDelegate {
 
+    override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
+    }
+
     func beginRequest(with context: NSExtensionContext) {
         UNUserNotificationCenter.current().delegate = self
         let item = context.inputItems[0] as! NSExtensionItem
@@ -15,11 +20,13 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNot
         if let msg = message, let type = msg["type"] as? String {
             if type == "TARGET_DETECTED" || type == "PLAY_SOUND" || type == "SHOW_NOTIFICATION" {
                 // 1. Play Physical iOS System Sound & Haptic Vibration
-                AudioServicesPlaySystemSound(1005) // Standard iOS System Alert Sound
-                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                AudioServicesPlayAlertSound(1005) // System Sound + Haptic Vibration
+                AudioServicesPlayAlertSound(1007)
+                AudioServicesPlayAlertSound(kSystemSoundID_Vibrate)
 
                 // 2. Request Notification Authorization & Post Local Notification Banner
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+                let center = UNUserNotificationCenter.current()
+                center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
                     let content = UNMutableNotificationContent()
                     content.title = "🎯 Auto Refresh XL - Target Detected!"
                     if let targetText = msg["targetText"] as? String, !targetText.isEmpty {
@@ -27,14 +34,14 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNot
                     } else {
                         content.body = "Target keyword was detected on your webpage!"
                     }
-                    content.sound = UNNotificationSound.default
+                    content.sound = UNNotificationSound.defaultCritical
 
                     let request = UNNotificationRequest(
                         identifier: "target_\(Date().timeIntervalSince1970)",
                         content: content,
                         trigger: nil
                     )
-                    UNUserNotificationCenter.current().add(request) { err in
+                    center.add(request) { err in
                         if let err = err {
                             os_log(.error, "Error posting UNNotification: %@", err.localizedDescription)
                         } else {

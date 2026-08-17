@@ -52,10 +52,10 @@ function triggerNativeAlert(targetText) {
   addLog('NATIVE', 'Sending native message: ' + JSON.stringify(payload));
   try {
     if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
-      browser.runtime.sendNativeMessage("application.id", payload);
+      browser.runtime.sendNativeMessage(payload);
       addLog('NATIVE', 'browser.runtime.sendNativeMessage sent', 'success');
     } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
-      chrome.runtime.sendNativeMessage("application.id", payload);
+      chrome.runtime.sendNativeMessage('', payload);
       addLog('NATIVE', 'chrome.runtime.sendNativeMessage sent', 'success');
     } else {
       addLog('NATIVE', 'sendNativeMessage API unavailable', 'warn');
@@ -273,7 +273,15 @@ async function sendToTab(tabId, message) {
     await chrome.tabs.sendMessage(tabId, message);
     return true;
   } catch (error) {
-    addLog('PAGE', `Could not deliver ${message.type} to tab ${tabId}: ${error.message}`, 'warn');
+    if (error.message && (error.message.includes('Tab not found') || error.message.includes('Could not establish connection') || error.message.includes('Invalid call'))) {
+      if (activeTabStates[tabId]) {
+        delete activeTabStates[tabId];
+        saveTabStates();
+        if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
+      }
+    } else {
+      addLog('PAGE', `Could not deliver ${message.type} to tab ${tabId}: ${error.message}`, 'warn');
+    }
     return false;
   }
 }
