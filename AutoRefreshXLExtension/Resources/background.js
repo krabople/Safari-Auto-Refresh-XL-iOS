@@ -278,7 +278,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ state: state });
     };
 
-    const reqTabId = request.tabId || targetTabId;
+    const reqTabId = request.tabId || senderTabId || targetTabId;
     if (reqTabId) {
       getStateExecution(reqTabId);
     } else {

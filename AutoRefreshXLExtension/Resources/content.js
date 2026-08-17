@@ -181,7 +181,7 @@
     } else if (currentTabState.matchType === 'regex') {
       try {
         const regex = new RegExp(target, 'i');
-        const bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
+        const bodyText = document.body ? (document.body.innerText + ' ' + document.body.textContent) : (document.documentElement ? document.documentElement.textContent : '');
         isFound = regex.test(bodyText);
         if (isFound) {
           matchedNode = findTextNodeMatching(regex);
@@ -190,7 +190,7 @@
         logDebug('SCAN', 'Invalid Regex: ' + target, 'error');
       }
     } else {
-      const bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
+      const bodyText = document.body ? (document.body.innerText + ' ' + document.body.textContent) : (document.documentElement ? document.documentElement.textContent : '');
       isFound = bodyText.toLowerCase().includes(target.toLowerCase());
       if (isFound) {
         matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'));
@@ -710,7 +710,11 @@
 
     overlayShadow.appendChild(style);
     overlayShadow.appendChild(widget);
-    document.body.appendChild(overlayElement);
+
+    const targetParent = document.body || document.documentElement;
+    if (targetParent) {
+      targetParent.appendChild(overlayElement);
+    }
 
     // Touch & Mouse Dragging for Mobile Safari
     const header = overlayShadow.querySelector('.arp-header');
