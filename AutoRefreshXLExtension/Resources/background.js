@@ -1,5 +1,6 @@
 const activeTabStates = {};
 const extensionLogs = [];
+let targetTabId = null;
 
 function addLog(category, message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -9,6 +10,38 @@ function addLog(category, message, type = 'info') {
 }
 
 addLog('SYSTEM', 'Background service worker initialized');
+
+function scheduleNextRefresh(tabId) {
+  const state = activeTabStates[tabId];
+  if (!state || !state.enabled) return;
+
+  let intervalSec = state.interval || 10;
+  if (state.mode === 'random') {
+    const min = Math.min(state.minInterval, state.maxInterval);
+    const max = Math.max(state.minInterval, state.maxInterval);
+    intervalSec = Math.round((Math.random() * (max - min) + min) * 10) / 10;
+  }
+
+  state.nextRefreshTime = Date.now() + intervalSec * 1000;
+  saveTabStates();
+
+  if (chrome.alarms) {
+    chrome.alarms.create(`refresh_tab_${tabId}`, { delayInMinutes: intervalSec / 60 });
+  }
+}
+
+if (chrome.alarms && chrome.alarms.onAlarm) {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name.startsWith('refresh_tab_')) {
+      const tabId = parseInt(alarm.name.replace('refresh_tab_', ''), 10);
+      const state = activeTabStates[tabId];
+      if (state && state.enabled) {
+        await triggerTabReload(tabId, state);
+        scheduleNextRefresh(tabId);
+      }
+    }
+  });
+}
 
 function triggerNativeAlert(targetText) {
   const payload = { type: 'TARGET_DETECTED', targetText: targetText || '' };

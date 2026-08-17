@@ -230,9 +230,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnAddCurrentDomain.addEventListener('click', async () => {
-    if (!tab || !tab.url) return;
+    const tabs = await chrome.tabs.query({ active: true });
+    const currentTab = (tabs && tabs[0]) ? tabs[0] : null;
+    if (!currentTab || !currentTab.url) return;
     try {
-      const urlObj = new URL(tab.url);
+      const urlObj = new URL(currentTab.url);
       const pattern = `*://${urlObj.hostname}/*`;
       const { autoStartRules } = await chrome.storage.local.get(['autoStartRules']);
       const rules = autoStartRules || [];

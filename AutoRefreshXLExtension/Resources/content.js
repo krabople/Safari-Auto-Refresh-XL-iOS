@@ -13,6 +13,10 @@
 
   let sharedAudioCtx = null;
 
+  function logDebug(category, message, type = 'info') {
+    console.log(`[AutoRefreshXL Content] [${category}] [${type}] ${message}`);
+  }
+
   function getUnlockedAudioContext() {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -224,13 +228,6 @@
       });
     } catch (e) {
       logDebug('NOTIFY', '🔴 Background Message Error: ' + e.message, 'error');
-    }
-
-    // 6. Native Alert Dispatch
-    try {
-      triggerNativeAlert(currentTabState.targetText);
-    } catch (e) {
-      logDebug('NATIVE', '🔴 Native Alert Error: ' + e.message, 'error');
     }
 
       if (overlayShadow) {
