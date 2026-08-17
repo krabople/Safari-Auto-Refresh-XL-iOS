@@ -117,8 +117,8 @@ chrome.storage.local.get(['tabStates'], (result) => {
   }
 });
 
-// Ticker loop every 1 second
-setInterval(async () => {
+// Ticker loop every 1 second for countdown UI ticks only
+setInterval(() => {
   const now = Date.now();
   const tabIds = Object.keys(activeTabStates);
 
@@ -128,18 +128,14 @@ setInterval(async () => {
 
     if (!state || !state.enabled) continue;
 
-    if (now >= state.nextRefreshTime) {
-      await triggerTabReload(tabId, state);
-    } else {
-      const remainingSeconds = Math.max(0, Math.ceil((state.nextRefreshTime - now) / 1000));
-      sendToTab(tabId, {
-        type: 'COUNTDOWN_TICK',
-        remainingSeconds: remainingSeconds,
-        refreshCount: state.refreshCount,
-        maxRefreshes: state.maxRefreshes,
-        state: state
-      });
-    }
+    const remainingSeconds = Math.max(0, Math.ceil((state.nextRefreshTime - now) / 1000));
+    sendToTab(tabId, {
+      type: 'COUNTDOWN_TICK',
+      remainingSeconds: remainingSeconds,
+      refreshCount: state.refreshCount,
+      maxRefreshes: state.maxRefreshes,
+      state: state
+    });
   }
 
   updateActiveTabBadge();
@@ -353,7 +349,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'TARGET_DETECTED') {
-    const tabId = targetTabId;
+    const tabId = request.tabId || senderTabId || targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
     const targetTxt = (state && state.targetText) ? state.targetText : (request.targetText || 'Keyword');
 
@@ -377,7 +373,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         state.enabled = false;
         saveTabStates();
         updateActiveTabBadge();
+        if (chrome.alarms && tabId) {
+          chrome.alarms.clear(`refresh_tab_${tabId}`);
+        }
         sendToTab(tabId, { type: 'REFRESH_STOPPED' });
+        addLog('TARGET', `Auto-refresh stopped for tab ${tabId} because target was detected`);
       }
 
       if (state.actionFocus && tabId) {

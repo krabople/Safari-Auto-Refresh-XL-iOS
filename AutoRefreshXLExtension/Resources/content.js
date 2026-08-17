@@ -238,7 +238,6 @@
         }
       }
     }
-  }
 
   function showTargetAlertBanner(targetText) {
     if (document.getElementById('arp-target-alert-banner')) return;
