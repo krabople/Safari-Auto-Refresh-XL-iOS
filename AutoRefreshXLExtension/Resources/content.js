@@ -100,44 +100,6 @@
       }
     }
 
-    if (currentTabState.overlayEnabled) {
-      renderFloatingOverlay();
-    }
-
-    if (currentTabState.stopOnInteraction) {
-      setupUserInteractionListener();
-    }
-  }
-      checkPageMonitoring();
-
-      // Continuous DOM polling loop every 500ms for dynamic JS/React rendering
-      if (!monitorIntervalId) {
-        monitorIntervalId = setInterval(() => {
-          if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
-            checkPageMonitoring();
-          } else {
-            stopMonitoringLoop();
-          }
-        }, 500);
-      }
-
-      // Continuous DOM MutationObserver
-      if (!monitorObserver && document.body) {
-        try {
-          monitorObserver = new MutationObserver(() => {
-            if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
-              checkPageMonitoring();
-            }
-          });
-          monitorObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-        } catch (e) {}
-      }
-    }
-
-    if (currentTabState.overlayEnabled) {
-      renderFloatingOverlay();
-    }
-
     if (currentTabState.stopOnInteraction) {
       setupUserInteractionListener();
     }
