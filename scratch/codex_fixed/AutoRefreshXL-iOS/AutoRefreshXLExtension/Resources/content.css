@@ -1,0 +1,19 @@
+/* Auto Refresh XL - iOS Safari Content CSS */
+
+.arp-highlight-target {
+  animation: arp-pulse-highlight 1.5s infinite ease-in-out !important;
+  outline: 3px solid #0ea5e9 !important;
+  border-radius: 4px !important;
+}
+
+@keyframes arp-pulse-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(14, 165, 233, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+  }
+}

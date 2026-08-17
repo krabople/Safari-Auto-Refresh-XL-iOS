@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Refresh XL - Advanced Options & Auto-Start Rules</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    body {
+      padding: 24px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .options-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .rule-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="app-title-group">
+        <svg class="app-logo" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        </svg>
+        <span class="app-title-text">Auto Refresh XL</span>
+      </div>
+    </header>
+
+    <main class="tab-content" style="display: block;">
+      <section class="options-card">
+        <h3>⚡ Auto-Start Rules</h3>
+        <p style="color: var(--text-muted); margin-bottom: 12px;">Auto refresh starts automatically when visiting these URL patterns.</p>
+        <div id="rulesList">
+          <div style="color: var(--text-muted); font-style: italic;">No auto-start rules created yet.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
