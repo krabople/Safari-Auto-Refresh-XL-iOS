@@ -3,7 +3,7 @@ import AudioToolbox
 import UserNotifications
 import os.log
 
-class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
+class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling, UNUserNotificationCenterDelegate {
 
     func beginRequest(with context: NSExtensionContext) {
         guard let item = context.inputItems.first as? NSExtensionItem,
@@ -93,11 +93,14 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         // default sound works with standard notification authorization.
         content.sound = playSound ? .default : nil
 
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
         let request = UNNotificationRequest(
             identifier: "target_\(UUID().uuidString)",
             content: content,
-            trigger: nil
+            trigger: trigger
         )
+
+        center.delegate = self
 
         center.add(request) { error in
             if let error = error {
@@ -107,6 +110,18 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 os_log(.default, "Successfully posted UNNotification banner")
                 self.complete(context, success: true)
             }
+        }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .list, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
         }
     }
 
