@@ -198,25 +198,37 @@ setInterval(async () => {
 }, 1000);
 
 async function runRefreshCycle(tabId, state) {
-  if (!state || !state.enabled) return;
+  if (!state || !state.enabled || state.isRefreshing) return;
+  state.isRefreshing = true;
 
-  // Persist the completed refresh count before navigation. The newly loaded
-  // content script uses this value to begin monitoring only after refresh #1.
   state.refreshCount += 1;
 
-  // Immediately schedule the following cycle so countdown never locks at 00:00.
-  // scheduleNextRefresh also persists the incremented refresh count.
-  scheduleNextRefresh(tabId);
+  if (state.monitorEnabled && state.targetText) {
+    // Keep the current document alive so its user-unlocked AudioContext remains
+    // valid. The content script fetches and scans a fresh copy of the URL.
+    const result = await requestFromTab(tabId, {
+      type: 'FETCH_MONITOR_CHECK',
+      state: state,
+      checkCount: state.refreshCount
+    });
 
-  try {
-    await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
-    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
-  } catch (err) {
-    addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
+    if (result && result.success) {
+      addLog('MONITOR', `Fetched and checked tab ${tabId} (Check: ${state.refreshCount})`, 'success');
+    } else {
+      addLog('MONITOR', `Fetch check failed for tab ${tabId}: ${(result && result.error) || 'Page script unavailable'}`, 'error');
+    }
+  } else {
+    try {
+      await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
+      addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
+    } catch (err) {
+      addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
+    }
   }
 
   if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
     state.enabled = false;
+    state.isRefreshing = false;
     saveTabStates();
     if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
 
@@ -232,6 +244,12 @@ async function runRefreshCycle(tabId, state) {
 
     sendToTab(tabId, { type: 'REFRESH_STOPPED', state: state });
     updateActiveTabBadge();
+  } else if (state.enabled) {
+    state.isRefreshing = false;
+    scheduleNextRefresh(tabId);
+  } else {
+    state.isRefreshing = false;
+    saveTabStates();
   }
 }
 
@@ -316,6 +334,15 @@ async function sendToTab(tabId, message) {
       addLog('PAGE', `Could not deliver ${message.type} to tab ${tabId}: ${error.message}`, 'warn');
     }
     return false;
+  }
+}
+
+async function requestFromTab(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (error) {
+    addLog('PAGE', `Could not complete ${message.type} in tab ${tabId}: ${error.message}`, 'error');
+    return { success: false, error: error.message };
   }
 }
 

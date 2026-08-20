@@ -11,6 +11,7 @@
   let monitorIntervalId = null;
   let monitorObserver = null;
   let monitorCheckTimer = null;
+  let audioUnlocked = false;
 
   let sharedAudioCtx = null;
 
@@ -36,7 +37,18 @@
 
   // Unlock AudioContext on user touch
   const unlockAudioOnTouch = () => {
-    getUnlockedAudioContext();
+    const context = getUnlockedAudioContext();
+    if (context) {
+      const markUnlocked = () => {
+        audioUnlocked = context.state === 'running';
+        updateSoundEnableControl();
+      };
+      if (context.state === 'running') {
+        markUnlocked();
+      } else {
+        context.resume().then(markUnlocked).catch(() => {});
+      }
+    }
     window.removeEventListener('touchstart', unlockAudioOnTouch, true);
     window.removeEventListener('click', unlockAudioOnTouch, true);
   };
@@ -52,7 +64,7 @@
     }
   });
 
-  chrome.runtime.onMessage.addListener((request) => {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'COUNTDOWN_TICK') {
       currentTabState = request.state;
       if (currentTabState && currentTabState.overlayEnabled && !overlayElement) {
@@ -74,39 +86,34 @@
       removeOverlay();
     } else if (request.type === 'TEST_SOUND') {
       playAlertSound();
+    } else if (request.type === 'FETCH_MONITOR_CHECK') {
+      currentTabState = request.state || currentTabState;
+      fetchAndCheckCurrentPage()
+        .then((matched) => sendResponse({ success: true, matched }))
+        .catch((error) => {
+          logDebug('FETCH', 'Fetch check failed: ' + error.message, 'error');
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
     }
   });
 
   function initContentFeatures() {
     if (!currentTabState) return;
 
-    if (currentTabState.overlayEnabled !== false && !overlayElement) {
+    const needsSoundControl = currentTabState.monitorEnabled &&
+      currentTabState.targetText &&
+      currentTabState.actionSound !== false &&
+      !audioUnlocked;
+
+    // iOS requires a control inside the webpage to unlock audio. Show the
+    // compact widget for that control even when the optional timer overlay is off.
+    if ((currentTabState.overlayEnabled !== false || needsSoundControl) && !overlayElement) {
       renderFloatingOverlay();
     }
 
-    // Starting the timer must not scan the page that is already open. The
-    // background worker persists refreshCount before reloading, so monitoring
-    // begins only in the page loaded by the first completed refresh.
-    const hasCompletedFirstRefresh = Number(currentTabState.refreshCount || 0) > 0;
-    if (hasCompletedFirstRefresh && currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
-      checkPageMonitoring();
-
-      if (!monitorIntervalId) {
-        monitorIntervalId = setInterval(() => {
-          if (!hasTriggeredTarget && currentTabState && currentTabState.monitorEnabled) {
-            checkPageMonitoring();
-          } else {
-            stopMonitoringLoop();
-          }
-        }, 500);
-      }
-
-      if (!monitorObserver && document.body) {
-        try {
-          monitorObserver = new MutationObserver(queueMonitoringCheck);
-          monitorObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-        } catch (e) {}
-      }
+    if (currentTabState.monitorEnabled && currentTabState.targetText && currentTabState.actionSound !== false) {
+      updateSoundEnableControl();
     }
 
     if (currentTabState.stopOnInteraction) {
@@ -139,15 +146,35 @@
     }, 100);
   }
 
-  function checkPageMonitoring() {
+  async function fetchAndCheckCurrentPage() {
+    if (!currentTabState || hasTriggeredTarget) return false;
+
+    logDebug('FETCH', 'Fetching a fresh copy of ' + window.location.href);
+    const response = await fetch(window.location.href, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'include',
+      redirect: 'follow'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+    }
+
+    const html = await response.text();
+    const fetchedDocument = new DOMParser().parseFromString(html, 'text/html');
+    return checkPageMonitoring(fetchedDocument, true);
+  }
+
+  function checkPageMonitoring(sourceDocument = document, isFetchedCopy = false) {
     if (!currentTabState) {
-      return;
+      return false;
     }
 
     const target = String(currentTabState.targetText || '').trim();
     if (!target) {
       logDebug('SCAN', 'Target text is empty');
-      return;
+      return false;
     }
 
     logDebug('SCAN', 'Scanning page for target "' + target + '" (refreshCount: ' + currentTabState.refreshCount + ')');
@@ -157,7 +184,7 @@
 
     if (currentTabState.matchType === 'xpath') {
       try {
-        const result = document.evaluate(target, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const result = sourceDocument.evaluate(target, sourceDocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         matchedNode = result.singleNodeValue;
         isFound = !!matchedNode;
       } catch (e) {
@@ -166,19 +193,19 @@
     } else if (currentTabState.matchType === 'regex') {
       try {
         const regex = new RegExp(target, 'i');
-        const bodyText = getPageText();
+        const bodyText = getPageText(sourceDocument);
         isFound = regex.test(bodyText);
         if (isFound) {
-          matchedNode = findTextNodeMatching(regex);
+          matchedNode = findTextNodeMatching(regex, sourceDocument);
         }
       } catch (e) {
         logDebug('SCAN', 'Invalid Regex: ' + target, 'error');
       }
     } else {
-      const bodyText = getPageText();
+      const bodyText = getPageText(sourceDocument);
       isFound = bodyText.toLowerCase().includes(target.toLowerCase());
       if (isFound) {
-        matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'));
+        matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'), sourceDocument);
       }
     }
 
@@ -187,7 +214,7 @@
 
     if (!conditionMet) {
       logDebug('SCAN', 'Target condition NOT met yet (isFound: ' + isFound + ')');
-      return;
+      return false;
     }
 
     logDebug('SCAN', '🎯 TARGET CONDITION MET! Target: "' + target + '"', 'success');
@@ -198,7 +225,7 @@
     // 1. Highlight exact matching text in webpage DOM
     let highlightedEl = null;
     try {
-      if (currentTabState.actionHighlight !== false) {
+      if (!isFetchedCopy && currentTabState.actionHighlight !== false) {
         logDebug('HIGHLIGHT', 'Executing highlightMatchingText...');
         highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
         if (highlightedEl) {
@@ -232,7 +259,7 @@
 
     // 4. Auto-Scroll to Highlighted Element
     try {
-      const targetToScroll = highlightedEl || matchedNode;
+      const targetToScroll = isFetchedCopy ? null : (highlightedEl || matchedNode);
       if (targetToScroll && currentTabState.actionScroll !== false) {
         logDebug('SCROLL', 'Scrolling to target element...');
         targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -262,6 +289,7 @@
           statusBadge.className = 'arp-status-badge arp-detected';
         }
       }
+      return true;
     }
 
   function showTargetAlertBanner(targetText) {
@@ -312,8 +340,8 @@
     });
   }
 
-  function getPageText() {
-    const root = document.body || document.documentElement;
+  function getPageText(sourceDocument = document) {
+    const root = sourceDocument.body || sourceDocument.documentElement;
     if (!root) return '';
     return `${root.innerText || ''} ${root.textContent || ''}`;
   }
@@ -434,8 +462,10 @@
     document.head.appendChild(style);
   }
 
-  function findTextNodeMatching(regex) {
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  function findTextNodeMatching(regex, sourceDocument = document) {
+    const root = sourceDocument.body || sourceDocument.documentElement;
+    if (!root) return null;
+    const walker = sourceDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
       regex.lastIndex = 0;
@@ -669,6 +699,14 @@
         background: #ef4444;
         color: #ffffff;
       }
+      .arp-btn-sound {
+        background: #0284c7;
+        color: #ffffff;
+        margin-bottom: 6px;
+      }
+      .arp-btn-sound.is-enabled {
+        background: #15803d;
+      }
     `;
 
     const widget = document.createElement('div');
@@ -693,6 +731,7 @@
           <span id="arp-mode-val">Fixed Interval</span>
           <span id="arp-count-val">Refreshes: 0</span>
         </div>
+        <button class="arp-btn arp-btn-sound" id="arp-enable-sound-btn">🔊 Enable Alert Sound</button>
         <div class="arp-actions">
           <button class="arp-btn arp-btn-danger" id="arp-stop-btn">Stop Refresh</button>
         </div>
@@ -749,9 +788,55 @@
     document.addEventListener('mouseup', endDrag);
 
     overlayShadow.querySelector('#arp-close-widget').addEventListener('click', removeOverlay);
+    overlayShadow.querySelector('#arp-enable-sound-btn').addEventListener('click', enableAlertAudio);
     overlayShadow.querySelector('#arp-stop-btn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ type: 'STOP_REFRESH' }, removeOverlay);
     });
+    updateSoundEnableControl();
+  }
+
+  async function enableAlertAudio() {
+    const context = getUnlockedAudioContext();
+    if (!context) {
+      audioUnlocked = false;
+      updateSoundEnableControl('Audio is unavailable');
+      return;
+    }
+
+    try {
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+      audioUnlocked = context.state === 'running';
+      if (!audioUnlocked) {
+        throw new Error('Safari did not unlock audio');
+      }
+
+      // Audible confirmation while this click still carries user activation.
+      playAlertSound();
+      updateSoundEnableControl();
+    } catch (error) {
+      audioUnlocked = false;
+      logDebug('SOUND', 'Could not enable alerts: ' + error.message, 'error');
+      updateSoundEnableControl('Tap again to enable sound');
+    }
+  }
+
+  function updateSoundEnableControl(failureText = '') {
+    if (!overlayShadow) return;
+    const button = overlayShadow.querySelector('#arp-enable-sound-btn');
+    if (!button) return;
+
+    if (!currentTabState || !currentTabState.monitorEnabled || currentTabState.actionSound === false) {
+      button.style.display = 'none';
+      return;
+    }
+
+    button.style.display = 'block';
+    button.classList.toggle('is-enabled', audioUnlocked);
+    button.textContent = audioUnlocked
+      ? '✓ Alert Sound Enabled'
+      : (failureText || '🔊 Enable Alert Sound');
   }
 
   function updateOverlayCountdown(remainingSeconds, refreshCount, maxRefreshes) {
