@@ -84,7 +84,11 @@
       renderFloatingOverlay();
     }
 
-    if (currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
+    // Starting the timer must not scan the page that is already open. The
+    // background worker persists refreshCount before reloading, so monitoring
+    // begins only in the page loaded by the first completed refresh.
+    const hasCompletedFirstRefresh = Number(currentTabState.refreshCount || 0) > 0;
+    if (hasCompletedFirstRefresh && currentTabState.monitorEnabled && currentTabState.targetText && !hasTriggeredTarget) {
       checkPageMonitoring();
 
       if (!monitorIntervalId) {
@@ -129,7 +133,7 @@
     if (monitorCheckTimer || hasTriggeredTarget) return;
     monitorCheckTimer = setTimeout(() => {
       monitorCheckTimer = null;
-      if (currentTabState && currentTabState.monitorEnabled && !hasTriggeredTarget) {
+      if (currentTabState && Number(currentTabState.refreshCount || 0) > 0 && currentTabState.monitorEnabled && !hasTriggeredTarget) {
         checkPageMonitoring();
       }
     }, 100);

@@ -58,7 +58,7 @@ async function triggerNativeAlert(targetText, options = {}) {
 
   try {
     if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
-      const response = await browser.runtime.sendNativeMessage(payload);
+      const response = await browser.runtime.sendNativeMessage('application.id', payload);
       if (!response || response.success !== true) {
         throw new Error((response && response.error) || 'Native alert did not report success');
       }
@@ -66,7 +66,7 @@ async function triggerNativeAlert(targetText, options = {}) {
       return response;
     } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
       const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendNativeMessage('', payload, (nativeResponse) => {
+        chrome.runtime.sendNativeMessage('application.id', payload, (nativeResponse) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
           } else {
@@ -148,10 +148,17 @@ const tabStatesReady = chrome.storage.local.get(['tabStates']).then((result) => 
 
   for (const [tabId, state] of Object.entries(activeTabStates)) {
     if (state && state.enabled) {
-      if (!state.nextRefreshTime || state.nextRefreshTime <= Date.now()) {
-        state.nextRefreshTime = Date.now() + 1000;
+      // Preserve the saved deadline when iOS recreates the service worker.
+      // Resetting it here can keep postponing the first refresh indefinitely.
+      if (!state.nextRefreshTime) {
+        state.nextRefreshTime = Date.now() + (state.interval || 10) * 1000;
+        saveTabStates();
       }
-      scheduleNextRefresh(Number(tabId));
+      if (chrome.alarms) {
+        chrome.alarms.create(`refresh_tab_${tabId}`, {
+          when: Math.max(Date.now() + 100, state.nextRefreshTime)
+        });
+      }
     }
   }
 }).catch((error) => {
@@ -193,17 +200,20 @@ setInterval(async () => {
 async function runRefreshCycle(tabId, state) {
   if (!state || !state.enabled) return;
 
-  // Immediately schedule next refresh cycle so countdown never locks at 00:00
+  // Persist the completed refresh count before navigation. The newly loaded
+  // content script uses this value to begin monitoring only after refresh #1.
+  state.refreshCount += 1;
+
+  // Immediately schedule the following cycle so countdown never locks at 00:00.
+  // scheduleNextRefresh also persists the incremented refresh count.
   scheduleNextRefresh(tabId);
 
   try {
     await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
-    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount + 1})`, 'success');
+    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
   } catch (err) {
     addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
   }
-
-  state.refreshCount += 1;
 
   if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
     state.enabled = false;
