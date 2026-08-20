@@ -342,9 +342,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnTestSound) {
     btnTestSound.addEventListener('click', () => {
-      playPopupSound();
       if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_SOUND' }).catch(() => {});
+        chrome.tabs.sendMessage(currentTabId, { type: 'SHOW_PRESTART_SOUND_CONTROL' })
+          .then(() => {
+            btnTestSound.textContent = '✓ Button Added to Webpage';
+          })
+          .catch(() => {
+            btnTestSound.textContent = 'Could Not Access This Page';
+          });
       }
     });
   }

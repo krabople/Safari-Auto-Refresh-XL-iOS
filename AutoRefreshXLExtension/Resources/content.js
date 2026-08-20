@@ -12,6 +12,8 @@
   let monitorObserver = null;
   let monitorCheckTimer = null;
   let audioUnlocked = false;
+  let preStartSoundHost = null;
+  let preStartSoundShadow = null;
 
   let sharedAudioCtx = null;
 
@@ -42,6 +44,7 @@
       const markUnlocked = () => {
         audioUnlocked = context.state === 'running';
         updateSoundEnableControl();
+        updatePreStartSoundControl();
       };
       if (context.state === 'running') {
         markUnlocked();
@@ -76,6 +79,7 @@
       currentTabState = request.state;
       hasTriggeredTarget = false;
       getUnlockedAudioContext();
+      removePreStartSoundControl();
       initContentFeatures();
     } else if (request.type === 'STATE_SYNC') {
       currentTabState = request.state;
@@ -86,6 +90,9 @@
       removeOverlay();
     } else if (request.type === 'TEST_SOUND') {
       playAlertSound();
+    } else if (request.type === 'SHOW_PRESTART_SOUND_CONTROL') {
+      renderPreStartSoundControl();
+      sendResponse({ success: true });
     } else if (request.type === 'FETCH_MONITOR_CHECK') {
       currentTabState = request.state || currentTabState;
       fetchAndCheckCurrentPage()
@@ -800,6 +807,7 @@
     if (!context) {
       audioUnlocked = false;
       updateSoundEnableControl('Audio is unavailable');
+      updatePreStartSoundControl('Audio is unavailable');
       return;
     }
 
@@ -815,10 +823,12 @@
       // Audible confirmation while this click still carries user activation.
       playAlertSound();
       updateSoundEnableControl();
+      updatePreStartSoundControl();
     } catch (error) {
       audioUnlocked = false;
       logDebug('SOUND', 'Could not enable alerts: ' + error.message, 'error');
       updateSoundEnableControl('Tap again to enable sound');
+      updatePreStartSoundControl('Tap again to enable sound');
     }
   }
 
@@ -837,6 +847,57 @@
     button.textContent = audioUnlocked
       ? '✓ Alert Sound Enabled'
       : (failureText || '🔊 Enable Alert Sound');
+  }
+
+  function renderPreStartSoundControl() {
+    if (preStartSoundHost) {
+      updatePreStartSoundControl();
+      return;
+    }
+
+    preStartSoundHost = document.createElement('div');
+    preStartSoundHost.id = 'arp-prestart-sound-host';
+    preStartSoundHost.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;';
+    preStartSoundShadow = preStartSoundHost.attachShadow({ mode: 'open' });
+    preStartSoundShadow.innerHTML = `
+      <style>
+        .panel { width: 230px; padding: 14px; border-radius: 12px; background: #0f172a; color: #f8fafc;
+          border: 1px solid rgba(0,242,254,.45); box-shadow: 0 12px 30px rgba(0,0,0,.5);
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+        .title { font-size: 14px; font-weight: 800; color: #00f2fe; margin-bottom: 5px; }
+        .help { font-size: 11px; line-height: 1.35; color: #cbd5e1; margin-bottom: 10px; }
+        button { width: 100%; padding: 9px; border: 0; border-radius: 7px; background: #0284c7;
+          color: white; font-size: 12px; font-weight: 800; }
+        button.enabled { background: #15803d; }
+        .close { margin-top: 7px; background: transparent; color: #94a3b8; font-weight: 600; }
+      </style>
+      <div class="panel">
+        <div class="title">Alert Sound Setup</div>
+        <div class="help">Tap below now. The sound will remain enabled when you start monitoring this page.</div>
+        <button id="enable">🔊 Enable and Test Sound</button>
+        <button class="close" id="close">Close</button>
+      </div>`;
+
+    (document.body || document.documentElement).appendChild(preStartSoundHost);
+    preStartSoundShadow.querySelector('#enable').addEventListener('click', enableAlertAudio);
+    preStartSoundShadow.querySelector('#close').addEventListener('click', removePreStartSoundControl);
+    updatePreStartSoundControl();
+  }
+
+  function updatePreStartSoundControl(failureText = '') {
+    if (!preStartSoundShadow) return;
+    const button = preStartSoundShadow.querySelector('#enable');
+    if (!button) return;
+    button.classList.toggle('enabled', audioUnlocked);
+    button.textContent = audioUnlocked
+      ? '✓ Alert Sound Enabled'
+      : (failureText || '🔊 Enable and Test Sound');
+  }
+
+  function removePreStartSoundControl() {
+    if (preStartSoundHost) preStartSoundHost.remove();
+    preStartSoundHost = null;
+    preStartSoundShadow = null;
   }
 
   function updateOverlayCountdown(remainingSeconds, refreshCount, maxRefreshes) {
