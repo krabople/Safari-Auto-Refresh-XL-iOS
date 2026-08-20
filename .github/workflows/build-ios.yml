@@ -22,9 +22,9 @@ jobs:
       run: |
         set -e
         echo "=== 1. Locating WebExtension Resources ==="
-        MANIFEST_PATH=$(find . -name "manifest.json" | head -n 1)
+        MANIFEST_PATH="$GITHUB_WORKSPACE/AutoRefreshXLExtension/Resources/manifest.json"
 
-        if [ -z "$MANIFEST_PATH" ]; then
+        if [ ! -f "$MANIFEST_PATH" ]; then
           echo "Error: manifest.json not found in repository."
           exit 1
         fi

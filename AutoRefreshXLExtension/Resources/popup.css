@@ -454,6 +454,29 @@ html, body {
   cursor: pointer;
 }
 
+.push-test-result {
+  display: none;
+  margin-top: -4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.push-test-result.is-success {
+  display: block;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.push-test-result.is-error {
+  display: block;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 .btn-donate {
   width: 100%;
   padding: 10px;

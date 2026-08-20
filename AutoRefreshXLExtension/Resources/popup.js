@@ -394,7 +394,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnTestPushLogs) {
     btnTestPushLogs.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'TEST_NATIVE_ALERT' }, () => {
+      const result = document.getElementById('pushTestResult');
+      btnTestPushLogs.disabled = true;
+      btnTestPushLogs.textContent = 'Testing…';
+      if (result) {
+        result.className = 'push-test-result';
+        result.textContent = '';
+      }
+
+      chrome.runtime.sendMessage({ type: 'TEST_NATIVE_ALERT' }, (response) => {
+        const runtimeError = chrome.runtime.lastError;
+        const succeeded = !runtimeError && response && response.success === true;
+        const message = runtimeError
+          ? runtimeError.message
+          : (response && response.error) || 'The native notification did not return a result.';
+
+        if (result) {
+          result.className = `push-test-result ${succeeded ? 'is-success' : 'is-error'}`;
+          result.textContent = succeeded
+            ? 'Notification request sent successfully.'
+            : `Notification failed: ${message}`;
+        }
+
+        btnTestPushLogs.disabled = false;
+        btnTestPushLogs.textContent = '📲 Test Push Alert';
         renderLogs();
       });
     });
