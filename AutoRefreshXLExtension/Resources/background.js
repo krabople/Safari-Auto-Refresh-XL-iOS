@@ -232,17 +232,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const refreshedState = activeTabStates[tabId];
     const hadPendingDetection = !!(refreshedState && refreshedState.pendingDetection);
     if (refreshedState && refreshedState.pendingDetection) {
-      const pending = refreshedState.pendingDetection;
-      const result = await requestFromTab(tabId, {
-        type: 'APPLY_DETECTED_PAGE_ACTIONS',
-        targetText: pending.targetText,
-        matchType: pending.matchType,
-        state: refreshedState
-      });
-      if (result && result.success) {
-        delete refreshedState.pendingDetection;
-        saveTabStates();
-      }
+      const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const isActive = !!(activeTabs[0] && activeTabs[0].id === tabId);
+      await applyPendingDetection(tabId, isActive);
     }
 
     if (!hadPendingDetection) {
@@ -278,6 +270,30 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   }
 });
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  if (activeTabStates[tabId] && activeTabStates[tabId].pendingDetection) {
+    await applyPendingDetection(tabId, true);
+  }
+});
+
+async function applyPendingDetection(tabId, performScroll) {
+  const state = activeTabStates[tabId];
+  const pending = state && state.pendingDetection;
+  if (!pending) return false;
+  const result = await requestFromTab(tabId, {
+    type: 'APPLY_DETECTED_PAGE_ACTIONS',
+    targetText: pending.targetText,
+    matchType: pending.matchType,
+    performScroll,
+    state
+  });
+  if (result && result.success && (performScroll || state.actionScroll === false)) {
+    delete state.pendingDetection;
+    saveTabStates();
+  }
+  return !!(result && result.success);
+}
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (activeTabStates[tabId]) {

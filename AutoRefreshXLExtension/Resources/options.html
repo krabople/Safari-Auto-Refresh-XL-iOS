@@ -7,10 +7,14 @@
   <link rel="stylesheet" href="popup.css">
   <style>
     body {
-      padding: 24px;
+      padding: 16px;
       max-width: 600px;
       margin: 0 auto;
     }
+    .options-header { display:flex; align-items:center; gap:12px; padding:14px 4px 18px; }
+    .options-logo { width:52px; height:52px; border-radius:12px; }
+    .options-header h1 { margin:0; font-size:20px; color:var(--text-primary); }
+    .options-header p { margin:3px 0 0; font-size:11px; color:var(--text-muted); }
     .options-card {
       background: var(--bg-secondary);
       border: 1px solid var(--border-color);
@@ -19,7 +23,9 @@
       margin-bottom: 20px;
     }
     .rule-item {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
       align-items: center;
       justify-content: space-between;
       padding: 10px;
@@ -27,26 +33,44 @@
       border-radius: 8px;
       margin-bottom: 8px;
     }
+    .rule-url { color:var(--accent-cyan); font-size:12px; font-weight:700; overflow-wrap:anywhere; }
+    .rule-meta { margin-top:4px; color:var(--text-muted); font-size:11px; }
+    .rule-actions { display:flex; gap:6px; align-items:center; }
+    .rule-button { width:58px; min-width:58px; padding:7px 4px; border:0; border-radius:6px; color:white; font-size:10px; font-weight:800; }
+    .btn-edit { background:#0284c7; }
+    .btn-delete { background:#dc2626; }
+    .edit-panel { margin-top:14px; padding:14px; border:1px solid rgba(0,242,254,.35); border-radius:10px; background:var(--bg-tertiary); }
+    .edit-panel label { display:block; margin:10px 0 5px; color:var(--text-muted); font-size:11px; font-weight:700; }
+    .edit-actions { display:flex; gap:8px; margin-top:12px; }
   </style>
 </head>
 <body>
   <div class="app-container">
-    <header class="app-header">
-      <div class="app-title-group">
-        <svg class="app-logo" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
-          <circle cx="12" cy="12" r="3" fill="currentColor"/>
-        </svg>
-        <span class="app-title-text">Auto Refresh XL</span>
+    <header class="options-header">
+      <img class="options-logo" src="icons/icon128.png" alt="">
+      <div>
+        <h1>Auto Refresh XL</h1>
+        <p>Advanced Auto-Start rule editor</p>
       </div>
     </header>
 
     <main class="tab-content" style="display: block;">
       <section class="options-card">
         <h3>⚡ Auto-Start Rules</h3>
-        <p style="color: var(--text-muted); margin-bottom: 12px;">Auto refresh starts automatically when visiting these URL patterns.</p>
+        <p style="color: var(--text-muted); margin-bottom: 12px;">Auto refresh starts automatically when visiting these exact pages or legacy URL patterns.</p>
         <div id="rulesList">
           <div style="color: var(--text-muted); font-style: italic;">No auto-start rules created yet.</div>
+        </div>
+        <div id="editPanel" class="edit-panel hidden">
+          <h4>Edit Rule</h4>
+          <label for="editUrl">Exact page URL</label>
+          <input class="text-input" type="url" id="editUrl">
+          <label for="editInterval">Default interval (seconds)</label>
+          <input class="text-input" type="number" min="1" id="editInterval">
+          <div class="edit-actions">
+            <button class="btn-secondary" id="saveEdit">Save Changes</button>
+            <button class="btn-link" id="cancelEdit">Cancel</button>
+          </div>
         </div>
       </section>
     </main>

@@ -381,15 +381,15 @@
   async function applyDetectedPageActions(request) {
     currentTabState = request.state || currentTabState;
     const shouldHighlight = !currentTabState || currentTabState.actionHighlight !== false;
-    const shouldScroll = !currentTabState || currentTabState.actionScroll !== false;
+    const shouldScroll = (!currentTabState || currentTabState.actionScroll !== false) && request.performScroll !== false;
     if (!shouldHighlight && !shouldScroll) return { success: true, found: false };
 
     // Give client-rendered pages a short opportunity to insert their content,
     // while retaining the extension's existing highlight appearance.
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      let matchedElement = null;
+      let matchedElement = document.querySelector('.arp-exact-word-highlight');
       if (shouldHighlight) {
-        matchedElement = highlightMatchingText(request.targetText, request.matchType || 'text');
+        matchedElement = matchedElement || highlightMatchingText(request.targetText, request.matchType || 'text');
       } else if ((request.matchType || 'text') === 'xpath') {
         try {
           const result = document.evaluate(request.targetText, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -406,7 +406,13 @@
       }
       if (matchedElement) {
         if (shouldScroll && typeof matchedElement.scrollIntoView === 'function') {
-          matchedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          matchedElement.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          matchedElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+          await new Promise(resolve => setTimeout(resolve, 900));
+          if (matchedElement.isConnected) {
+            matchedElement.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+          }
         }
         return { success: true, found: true };
       }

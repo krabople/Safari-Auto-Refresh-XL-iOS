@@ -34,12 +34,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnAddCurrentPage = document.getElementById('btnAddCurrentPage');
   const btnOpenOptions = document.getElementById('btnOpenOptions');
   const autoStartResult = document.getElementById('autoStartResult');
+  const btnCloseRuleEditor = document.getElementById('btnCloseRuleEditor');
+  const inlineRulesList = document.getElementById('inlineRulesList');
+  const ruleEditPanel = document.getElementById('ruleEditPanel');
+  const editRuleUrl = document.getElementById('editRuleUrl');
+  const editRuleInterval = document.getElementById('editRuleInterval');
+  const btnSaveRule = document.getElementById('btnSaveRule');
+  const btnCancelRule = document.getElementById('btnCancelRule');
 
   let currentTabId = null;
   let activeState = null;
   let draftReady = false;
   let popupDraftCache = {};
   let targetWasEmpty = true;
+  let editingRuleIndex = -1;
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -320,7 +328,98 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (btnOpenOptions) {
-    btnOpenOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
+    btnOpenOptions.addEventListener('click', async () => {
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      document.getElementById('tab-autostart-editor').classList.add('active');
+      await renderInlineRules();
+    });
+  }
+
+  if (btnCloseRuleEditor) {
+    btnCloseRuleEditor.addEventListener('click', () => {
+      closeRuleEditPanel();
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      document.getElementById('tab-autostart').classList.add('active');
+    });
+  }
+
+  function escapeRuleText(value) {
+    return String(value || '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[character]));
+  }
+
+  async function renderInlineRules() {
+    if (!inlineRulesList) return;
+    const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
+    if (!autoStartRules.length) {
+      inlineRulesList.innerHTML = '<div class="support-note">No Auto-Start rules have been added yet.</div>';
+      return;
+    }
+    inlineRulesList.innerHTML = autoStartRules.map((rule, index) => `
+      <div class="inline-rule-row">
+        <div>
+          <div class="inline-rule-url">${escapeRuleText(rule.exactUrl || rule.pattern)}</div>
+          <div class="inline-rule-meta">${rule.urlMatch === 'exact' || rule.exactUrl ? 'Exact page' : 'URL pattern'} · ${Number(rule.settings && rule.settings.interval) || 10}s</div>
+        </div>
+        <div class="inline-rule-actions">
+          <button type="button" class="rule-action-btn rule-action-edit" data-edit-rule="${index}">Edit</button>
+          <button type="button" class="rule-action-btn rule-action-delete" data-delete-rule="${index}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+
+    inlineRulesList.querySelectorAll('[data-edit-rule]').forEach(button => {
+      button.addEventListener('click', () => openRuleEditPanel(autoStartRules, Number(button.dataset.editRule)));
+    });
+    inlineRulesList.querySelectorAll('[data-delete-rule]').forEach(button => {
+      button.addEventListener('click', async () => {
+        const index = Number(button.dataset.deleteRule);
+        if (!confirm('Delete this Auto-Start rule?')) return;
+        autoStartRules.splice(index, 1);
+        await chrome.storage.local.set({ autoStartRules });
+        closeRuleEditPanel();
+        await renderInlineRules();
+      });
+    });
+  }
+
+  function openRuleEditPanel(rules, index) {
+    const rule = rules[index];
+    if (!rule) return;
+    editingRuleIndex = index;
+    editRuleUrl.value = rule.exactUrl || rule.pattern || '';
+    editRuleInterval.value = Number(rule.settings && rule.settings.interval) || 10;
+    ruleEditPanel.classList.remove('hidden');
+    editRuleUrl.focus();
+  }
+
+  function closeRuleEditPanel() {
+    editingRuleIndex = -1;
+    if (ruleEditPanel) ruleEditPanel.classList.add('hidden');
+  }
+
+  if (btnCancelRule) btnCancelRule.addEventListener('click', closeRuleEditPanel);
+
+  if (btnSaveRule) {
+    btnSaveRule.addEventListener('click', async () => {
+      const url = editRuleUrl.value.trim();
+      const interval = Math.max(1, Number.parseInt(editRuleInterval.value, 10) || 10);
+      if (!/^https?:\/\//i.test(url)) {
+        alert('Enter a complete webpage URL beginning with http:// or https://.');
+        return;
+      }
+      const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
+      const rule = autoStartRules[editingRuleIndex];
+      if (!rule) return;
+      rule.pattern = url;
+      rule.exactUrl = url;
+      rule.urlMatch = 'exact';
+      rule.settings = Object.assign({}, rule.settings || {}, { interval });
+      await chrome.storage.local.set({ autoStartRules });
+      closeRuleEditPanel();
+      await renderInlineRules();
+    });
   }
 
   const btnTestSound = document.getElementById('btnTestSound');
