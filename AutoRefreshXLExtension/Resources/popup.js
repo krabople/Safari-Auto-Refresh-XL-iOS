@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const conditionType = document.getElementById('conditionType');
   const actStop = document.getElementById('actStop');
   const actSound = document.getElementById('actSound');
-  const actNotify = document.getElementById('actNotify');
   const actHighlight = document.getElementById('actHighlight');
   const actScroll = document.getElementById('actScroll');
   const actFocus = document.getElementById('actFocus');
@@ -38,13 +37,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const linkEmail = document.getElementById('linkEmail');
   const btnReview = document.getElementById('btnReview');
   const reviewAvailability = document.getElementById('reviewAvailability');
-  const soundStartDialog = document.getElementById('soundStartDialog');
-  const btnPrepareSound = document.getElementById('btnPrepareSound');
-  const btnStartWithoutSound = document.getElementById('btnStartWithoutSound');
-  const btnCancelStart = document.getElementById('btnCancelStart');
 
   let currentTabId = null;
   let activeState = null;
+  let draftReady = false;
+  let popupDraftCache = {};
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -55,21 +52,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Query tabs error:', e);
   }
 
-  if (currentTabId) {
-    chrome.runtime.sendMessage({ type: 'GET_TAB_STATE', tabId: currentTabId }, (response) => {
-      if (response && response.state) {
-        activeState = response.state;
-        populateUI(activeState);
-      }
-    });
-  } else {
-    chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
-      if (response && response.state) {
-        activeState = response.state;
-        populateUI(activeState);
-      }
-    });
-  }
+  const stateRequest = currentTabId
+    ? { type: 'GET_TAB_STATE', tabId: currentTabId }
+    : { type: 'GET_TAB_STATE' };
+  chrome.runtime.sendMessage(stateRequest, async (response) => {
+    if (!response || !response.state) return;
+    activeState = response.state;
+    const { popupDrafts = {} } = await chrome.storage.local.get(['popupDrafts']);
+    popupDraftCache = popupDrafts;
+    const savedDraft = currentTabId ? popupDraftCache[String(currentTabId)] : null;
+    populateUI(activeState.enabled || !savedDraft
+      ? activeState
+      : Object.assign({}, activeState, savedDraft));
+    draftReady = true;
+  });
 
   document.querySelectorAll('.nav-tab').forEach(tabBtn => {
     tabBtn.addEventListener('click', () => {
@@ -146,7 +142,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     conditionType.value = state.condition || 'appears';
     actStop.checked = state.actionStop !== false;
     actSound.checked = state.actionSound !== false;
-    if (actNotify) actNotify.checked = state.actionNotify !== false;
     actHighlight.checked = state.actionHighlight !== false;
     actScroll.checked = state.actionScroll !== false;
     if (actFocus) actFocus.checked = state.actionFocus !== false;
@@ -181,29 +176,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Math.max(1, total);
   }
 
-  function getAudioStatus() {
-    if (!currentTabId) return Promise.resolve({ unlocked: false });
-    return chrome.tabs.sendMessage(currentTabId, { type: 'GET_AUDIO_STATUS' })
-      .catch(() => ({ unlocked: false }));
+  function collectDraft() {
+    return {
+      interval: getSelectedIntervalSeconds(),
+      mode: toggleRandom.checked ? 'random' : 'fixed',
+      minInterval: parseInt(inputMinSec.value, 10) || 5,
+      maxInterval: parseInt(inputMaxSec.value, 10) || 15,
+      maxRefreshes: parseInt(inputMaxRefreshes.value, 10) || 0,
+      hardRefresh: toggleHardRefresh.checked,
+      overlayEnabled: toggleOverlay.checked,
+      stopOnInteraction: toggleStopOnInteraction.checked,
+      monitorEnabled: toggleMonitor.checked || targetText.value.trim().length > 0,
+      targetText: targetText.value,
+      matchType: matchType.value,
+      condition: conditionType.value,
+      actionStop: actStop.checked,
+      actionSound: actSound.checked,
+      actionHighlight: actHighlight.checked,
+      actionScroll: actScroll.checked
+    };
   }
 
-  function askAboutSound() {
-    return new Promise(resolve => {
-      soundStartDialog.classList.remove('hidden');
-
-      const finish = choice => {
-        soundStartDialog.classList.add('hidden');
-        btnPrepareSound.onclick = null;
-        btnStartWithoutSound.onclick = null;
-        btnCancelStart.onclick = null;
-        resolve(choice);
-      };
-
-      btnPrepareSound.onclick = () => finish('prepare');
-      btnStartWithoutSound.onclick = () => finish('continue');
-      btnCancelStart.onclick = () => finish('cancel');
-    });
+  async function saveDraft() {
+    if (!draftReady || !currentTabId) return;
+    popupDraftCache[String(currentTabId)] = collectDraft();
+    await chrome.storage.local.set({ popupDrafts: popupDraftCache });
   }
+
+  document.querySelector('.app-container').addEventListener('input', saveDraft);
+  document.querySelector('.app-container').addEventListener('change', saveDraft);
+  document.querySelector('.app-container').addEventListener('click', (event) => {
+    if (event.target.closest('.chip, .nav-tab')) saveDraft();
+  });
 
   function startRefresh(statePayload) {
     updateActiveStatus(true);
@@ -217,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  startStopBtn.addEventListener('click', async () => {
+  startStopBtn.addEventListener('click', () => {
     const isActive = statusDot.classList.contains('active');
 
     if (isActive) {
@@ -252,29 +256,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         actionStop: actStop ? actStop.checked : true,
         actionSound: actSound ? actSound.checked : true,
         soundEnabled: true,
-        actionNotify: actNotify ? actNotify.checked : true,
         actionHighlight: actHighlight ? actHighlight.checked : true,
         actionScroll: actScroll ? actScroll.checked : true,
         actionFocus: actFocus ? actFocus.checked : false
       };
 
-      if (statePayload.monitorEnabled && statePayload.actionSound) {
-        const audioStatus = await getAudioStatus();
-        if (!audioStatus || !audioStatus.unlocked) {
-          const choice = await askAboutSound();
-          if (choice === 'cancel') return;
-          if (choice === 'prepare') {
-            try {
-              await chrome.tabs.sendMessage(currentTabId, { type: 'SHOW_PRESTART_SOUND_CONTROL' });
-              alert('Return to the webpage and tap “Enable and Test Sound”. Then open the extension and press Start Refresh again.');
-            } catch (error) {
-              alert('The sound control could not be added to this page. Safari may not allow extensions on it.');
-            }
-            return;
-          }
-        }
-      }
-
+      saveDraft();
       startRefresh(statePayload);
     }
   });
@@ -357,14 +344,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnTestSound) {
     btnTestSound.addEventListener('click', () => {
-      if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { type: 'SHOW_PRESTART_SOUND_CONTROL' })
-          .then(() => {
-            btnTestSound.textContent = '✓ Button Added to Webpage';
-          })
-          .catch(() => {
-            btnTestSound.textContent = 'Could Not Access This Page';
-          });
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const context = new AudioCtx();
+        const now = context.currentTime;
+        [880, 1320].forEach((frequency, index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.frequency.value = frequency;
+          gain.gain.setValueAtTime(0.0001, now + index * 0.16);
+          gain.gain.exponentialRampToValueAtTime(0.28, now + index * 0.16 + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.16 + 0.22);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(now + index * 0.16);
+          oscillator.stop(now + index * 0.16 + 0.23);
+        });
+        btnTestSound.textContent = '✓ Sound Played';
+        setTimeout(() => { btnTestSound.textContent = '🔊 Test Notification Sound'; }, 1200);
+      } catch (error) {
+        btnTestSound.textContent = 'Sound Unavailable';
       }
     });
   }

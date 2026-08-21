@@ -194,8 +194,8 @@
         </div>
 
         <div class="form-group">
-          <button type="button" class="btn-secondary" id="btnTestSound" style="width: 100%;">🔊 Enable Alert Sound Before Start</button>
-          <small style="display: block; margin-top: 6px; color: #94a3b8; line-height: 1.35;">Places a sound-enable button on the webpage. Tap that webpage button before starting monitoring.</small>
+          <button type="button" class="btn-secondary" id="btnTestSound" style="width: 100%;">🔊 Test Notification Sound</button>
+          <small style="display: block; margin-top: 6px; color: #94a3b8; line-height: 1.35;">Plays the sound used when monitored content is detected. Use the on-page widget to enable or disable live alerts.</small>
         </div>
       </section>
 
@@ -235,16 +235,6 @@
         </div>
       </section>
     </main>
-  </div>
-
-  <div class="dialog-backdrop hidden" id="soundStartDialog" role="dialog" aria-modal="true" aria-labelledby="soundStartTitle">
-    <div class="dialog-card">
-      <h3 id="soundStartTitle">Enable audible alerts?</h3>
-      <p>iOS requires one tap inside the webpage before alert sounds can play. The refresh timer will not start until you choose.</p>
-      <button class="btn-secondary dialog-primary" id="btnPrepareSound">Enable Sound First</button>
-      <button class="btn-link" id="btnStartWithoutSound">Start Without Enabling</button>
-      <button class="btn-link dialog-cancel" id="btnCancelStart">Cancel</button>
-    </div>
   </div>
 
   <script src="popup.js"></script>

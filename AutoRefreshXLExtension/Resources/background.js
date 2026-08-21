@@ -47,47 +47,6 @@ if (chrome.alarms && chrome.alarms.onAlarm) {
   });
 }
 
-async function triggerNativeAlert(targetText, options = {}) {
-  const payload = {
-    type: 'TARGET_DETECTED',
-    targetText: targetText || '',
-    playSound: options.playSound !== false,
-    showNotification: options.showNotification !== false
-  };
-  addLog('NATIVE', 'Sending native message: ' + JSON.stringify(payload));
-
-  try {
-    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendNativeMessage) {
-      const response = await browser.runtime.sendNativeMessage('application.id', payload);
-      if (!response || response.success !== true) {
-        throw new Error((response && response.error) || 'Native alert did not report success');
-      }
-      addLog('NATIVE', 'Native alert completed successfully', 'success');
-      return response;
-    } else if (chrome.runtime && chrome.runtime.sendNativeMessage) {
-      const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendNativeMessage('application.id', payload, (nativeResponse) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(nativeResponse);
-          }
-        });
-      });
-      if (!response || response.success !== true) {
-        throw new Error((response && response.error) || 'Native alert did not report success');
-      }
-      addLog('NATIVE', 'Native alert completed successfully', 'success');
-      return response;
-    } else {
-      throw new Error('sendNativeMessage API unavailable');
-    }
-  } catch (e) {
-    addLog('NATIVE', '🔴 Native alert failed: ' + e.message, 'error');
-    return { success: false, error: e.message };
-  }
-}
-
 const DEFAULT_TAB_STATE = {
   enabled: false,
   mode: 'fixed',
@@ -109,7 +68,6 @@ const DEFAULT_TAB_STATE = {
   actionStop: true,
   actionSound: true,
   soundEnabled: true,
-  actionNotify: true,
   actionHighlight: true,
   actionScroll: true,
   actionFocus: true
@@ -204,9 +162,10 @@ async function runRefreshCycle(tabId, state) {
 
   state.refreshCount += 1;
 
+  let monitorMatched = false;
   if (state.monitorEnabled && state.targetText) {
-    // Keep the current document alive so its user-unlocked AudioContext remains
-    // valid. The content script fetches and scans a fresh copy of the URL.
+    // Scan a fresh response before navigating. This lets an already-unlocked
+    // active tab present the alert before a reload destroys its document.
     const result = await requestFromTab(tabId, {
       type: 'FETCH_MONITOR_CHECK',
       state: state,
@@ -214,17 +173,20 @@ async function runRefreshCycle(tabId, state) {
     });
 
     if (result && result.success) {
+      monitorMatched = result.matched === true;
       addLog('MONITOR', `Fetched and checked tab ${tabId} (Check: ${state.refreshCount})`, 'success');
     } else {
       addLog('MONITOR', `Fetch check failed for tab ${tabId}: ${(result && result.error) || 'Page script unavailable'}`, 'error');
     }
-  } else {
-    try {
-      await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
-      addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
-    } catch (err) {
-      addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
-    }
+  }
+
+  // Monitoring must not turn refresh into a hidden background fetch. Always
+  // reload the visible tab, including the final cycle that detects the target.
+  try {
+    await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
+    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount}, matched: ${monitorMatched})`, 'success');
+  } catch (err) {
+    addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
   }
 
   if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
@@ -232,16 +194,6 @@ async function runRefreshCycle(tabId, state) {
     state.isRefreshing = false;
     saveTabStates();
     if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
-
-    if (state.actionNotify) {
-      chrome.notifications.create(`limit_${tabId}_${Date.now()}`, {
-        type: 'basic',
-        iconUrl: 'icons/icon128.png',
-        title: 'Auto Refresh XL - Limit Reached',
-        message: `Tab completed its limit of ${state.maxRefreshes} refreshes.`,
-        priority: 2
-      });
-    }
 
     sendToTab(tabId, { type: 'REFRESH_STOPPED', state: state });
     updateActiveTabBadge();
@@ -457,13 +409,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === 'TEST_NATIVE_ALERT') {
-    addLog('TEST', 'User clicked Test Push Alert button in popup');
-    triggerNativeAlert('Test Alert', { playSound: true, showNotification: true })
-      .then(sendResponse);
-    return true;
-  }
-
   if (request.type === 'TARGET_DETECTED') {
     const tabId = request.tabId || senderTabId || targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
@@ -520,17 +465,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === 'SHOW_NOTIFICATION') {
-    if (chrome.notifications && chrome.notifications.create) {
-      chrome.notifications.create(`notify_${Date.now()}`, {
-        type: 'basic',
-        iconUrl: 'icons/icon128.png',
-        title: request.title || 'Auto Refresh XL - Target Detected!',
-        message: request.message || 'Target detected on webpage!',
-        priority: 2
-      });
-    }
-    sendResponse({ success: true });
-    return true;
-  }
 });

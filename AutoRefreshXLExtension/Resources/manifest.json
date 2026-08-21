@@ -9,9 +9,7 @@
     "storage",
     "tabs",
     "activeTab",
-    "notifications",
-    "scripting",
-    "nativeMessaging"
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"

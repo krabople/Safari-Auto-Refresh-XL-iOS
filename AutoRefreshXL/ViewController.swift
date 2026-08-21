@@ -1,6 +1,5 @@
 import UIKit
 import SafariServices
-import UserNotifications
 
 class ViewController: UIViewController {
 
@@ -91,7 +90,7 @@ class ViewController: UIViewController {
         ])
         mainStack.addArrangedSubview(headerCard)
 
-        // 2. Button Action Stack (Settings & Notifications)
+        // 2. Safari Settings Button
         let buttonStack = UIStackView()
         buttonStack.axis = .vertical
         buttonStack.spacing = 10
@@ -108,20 +107,7 @@ class ViewController: UIViewController {
         openSettingsBtn.heightAnchor.constraint(equalToConstant: 46).isActive = true
         openSettingsBtn.addTarget(self, action: #selector(openSettingsTapped), for: .touchUpInside)
 
-        let requestNotifyBtn = UIButton(type: .system)
-        requestNotifyBtn.setTitle("🔔 Enable System Notifications", for: .normal)
-        requestNotifyBtn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .bold)
-        requestNotifyBtn.setTitleColor(.white, for: .normal)
-        requestNotifyBtn.backgroundColor = UIColor(red: 22/255, green: 30/255, blue: 46/255, alpha: 1.0)
-        requestNotifyBtn.layer.cornerRadius = 12
-        requestNotifyBtn.layer.borderWidth = 1
-        requestNotifyBtn.layer.borderColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 0.3).cgColor
-        requestNotifyBtn.translatesAutoresizingMaskIntoConstraints = false
-        requestNotifyBtn.heightAnchor.constraint(equalToConstant: 46).isActive = true
-        requestNotifyBtn.addTarget(self, action: #selector(requestNotificationsTapped), for: .touchUpInside)
-
         buttonStack.addArrangedSubview(openSettingsBtn)
-        buttonStack.addArrangedSubview(requestNotifyBtn)
         mainStack.addArrangedSubview(buttonStack)
 
         // 3. Step-by-Step Setup Guide Card
@@ -175,7 +161,7 @@ class ViewController: UIViewController {
             ("📌 On-Page Overlay Widget", "Shows a live floating countdown widget directly on top of webpage content so you can monitor progress while browsing."),
             ("👆 Touch Interaction Safety", "Enable 'Stop on Interaction' to automatically pause auto-refreshing if you tap, scroll, or type on the page."),
             ("🔍 Page Content Monitoring", "Scans the webpage content for target text (e.g. 'In Stock', 'Available'), Regular Expressions, or XPath selectors. Choose between 'Target Appears' or 'Target Disappears'."),
-            ("🔔 Smart Alert Actions", "When target content is detected, automatically play sound alerts, send iOS notifications, highlight elements, auto-scroll to detected items, or focus the tab."),
+            ("🔔 Smart Alert Actions", "When target content is detected, automatically play sound alerts, show an on-screen alert, highlight elements, or auto-scroll to detected items."),
             ("⚡ Auto-Start Domain Rules", "Add domain patterns to your Auto-Start list so auto-refreshing starts automatically whenever you navigate to matching sites.")
         ]
 
@@ -306,17 +292,4 @@ class ViewController: UIViewController {
         }
     }
 
-    @objc private func requestNotificationsTapped() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            DispatchQueue.main.async {
-                let alert = UIAlertController(
-                    title: granted ? "Notifications Allowed" : "Notifications Disabled",
-                    message: granted ? "System notifications are enabled! You can manage alert styles, sounds, and banners in iOS Settings ➔ Safari Auto Refresh XL ➔ Notifications." : "Permission was not granted. Please enable Notifications in your iOS Settings app.",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                self.present(alert, animated: true)
-            }
-        }
-    }
 }
