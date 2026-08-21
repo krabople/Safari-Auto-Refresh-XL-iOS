@@ -96,10 +96,21 @@
     } else if (request.type === 'GET_AUDIO_STATUS') {
       sendResponse({ unlocked: audioUnlocked && sharedAudioCtx && sharedAudioCtx.state === 'running' });
     } else if (request.type === 'PRESENT_TARGET_ALERT') {
-      const shouldPlaySound = request.playSound !== false && soundAlertsEnabled && audioUnlocked;
-      if (shouldPlaySound) playAlertSound();
-      showTargetAlertBanner(request.targetText || 'Keyword');
-      sendResponse({ success: true, soundPlayed: shouldPlaySound });
+      const shouldAttemptSound = request.playSound !== false && soundAlertsEnabled;
+      (async () => {
+        const soundPlayed = shouldAttemptSound ? await playAlertSound() : false;
+        showTargetAlertBanner(
+          request.targetText || 'Keyword',
+          request.sourceTabId,
+          request.showOpenTabButton === true,
+          shouldAttemptSound && !soundPlayed
+        );
+        sendResponse({ success: true, soundPlayed });
+      })();
+      return true;
+    } else if (request.type === 'APPLY_DETECTED_PAGE_ACTIONS') {
+      applyDetectedPageActions(request).then(sendResponse);
+      return true;
     } else if (request.type === 'FETCH_MONITOR_CHECK') {
       currentTabState = request.state || currentTabState;
       fetchAndCheckCurrentPage()
@@ -288,7 +299,7 @@
       return true;
     }
 
-  function showTargetAlertBanner(targetText) {
+  function showTargetAlertBanner(targetText, sourceTabId, showOpenTabButton, showEnableSoundButton) {
     if (document.getElementById('arp-target-alert-banner')) return;
 
     const banner = document.createElement('div');
@@ -315,8 +326,30 @@
         🎯 TARGET DETECTED!
       </div>
       <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
-        Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on this page.
+        Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on the monitored page.
       </div>
+      ${showEnableSoundButton ? `<button id="arp-banner-enable-sound" style="
+        background: #15803d;
+        color: #fff;
+        border: none;
+        padding: 8px 18px;
+        margin-right: 6px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 13px;
+        cursor: pointer;
+      ">Enable Sound</button>` : ''}
+      ${showOpenTabButton ? `<button id="arp-banner-open-tab" style="
+        background: linear-gradient(135deg, #00f2fe, #0284c7);
+        color: #000;
+        border: none;
+        padding: 8px 18px;
+        margin-right: 6px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 13px;
+        cursor: pointer;
+      ">View Monitored Tab</button>` : ''}
       <button id="arp-banner-dismiss" style="
         background: linear-gradient(135deg, #00f2fe, #0284c7);
         color: #000;
@@ -334,6 +367,52 @@
     document.getElementById('arp-banner-dismiss')?.addEventListener('click', () => {
       banner.remove();
     });
+    document.getElementById('arp-banner-open-tab')?.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'FOCUS_MONITORED_TAB', tabId: sourceTabId });
+      banner.remove();
+    });
+    document.getElementById('arp-banner-enable-sound')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      await enableAlertAudio();
+      button.remove();
+    });
+  }
+
+  async function applyDetectedPageActions(request) {
+    currentTabState = request.state || currentTabState;
+    const shouldHighlight = !currentTabState || currentTabState.actionHighlight !== false;
+    const shouldScroll = !currentTabState || currentTabState.actionScroll !== false;
+    if (!shouldHighlight && !shouldScroll) return { success: true, found: false };
+
+    // Give client-rendered pages a short opportunity to insert their content,
+    // while retaining the extension's existing highlight appearance.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      let matchedElement = null;
+      if (shouldHighlight) {
+        matchedElement = highlightMatchingText(request.targetText, request.matchType || 'text');
+      } else if ((request.matchType || 'text') === 'xpath') {
+        try {
+          const result = document.evaluate(request.targetText, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          matchedElement = result.singleNodeValue;
+        } catch (error) {}
+      } else {
+        try {
+          const regex = request.matchType === 'regex'
+            ? new RegExp(request.targetText, 'i')
+            : new RegExp(escapeRegExp(request.targetText), 'i');
+          const matchedNode = findTextNodeMatching(regex, document);
+          matchedElement = matchedNode && (matchedNode.parentElement || matchedNode);
+        } catch (error) {}
+      }
+      if (matchedElement) {
+        if (shouldScroll && typeof matchedElement.scrollIntoView === 'function') {
+          matchedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return { success: true, found: true };
+      }
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
+    return { success: true, found: false };
   }
 
   function getPageText(sourceDocument = document) {
@@ -515,12 +594,14 @@
   async function playAlertSound() {
     logDebug('SOUND', 'Attempting audio playback (HTML5 Audio + Web Audio API)...');
 
+    let played = false;
     try {
       const uri = getChimeAudioURI();
       if (uri) {
         const audio = new Audio(uri);
         audio.volume = 1.0;
-        audio.play().then(() => {
+        await audio.play().then(() => {
+          played = true;
           logDebug('SOUND', '🔊 HTML5 Audio played successfully!', 'success');
         }).catch(e => {
           logDebug('SOUND', '🔴 HTML5 Audio.play() Error: ' + e.name + ' - ' + e.message, 'error');
@@ -539,6 +620,7 @@
           audioUnlocked = ctx.state === 'running';
           logDebug('SOUND', 'Web AudioContext resumed', 'success');
         }
+        if (ctx.state !== 'running') return played;
         const now = ctx.currentTime;
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
@@ -550,6 +632,7 @@
         gain1.connect(ctx.destination);
         osc1.start(now);
         osc1.stop(now + 0.35);
+        played = true;
         logDebug('SOUND', '🔊 Web Audio Oscillator tone triggered!', 'success');
       } else {
         logDebug('SOUND', '⚠️ Web AudioContext unavailable', 'warn');
@@ -557,6 +640,7 @@
     } catch (e) {
       logDebug('SOUND', '🔴 Web Audio Exception: ' + e.message, 'error');
     }
+    return played;
   }
 
   function renderFloatingOverlay() {
@@ -656,6 +740,17 @@
         color: #94a3b8;
         margin-bottom: 8px;
       }
+      .arp-monitor-term {
+        margin: -1px 0 8px;
+        padding: 5px 7px;
+        border-radius: 5px;
+        background: rgba(14, 165, 233, 0.12);
+        color: #bae6fd;
+        font-size: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .arp-actions {
         display: flex;
         gap: 6px;
@@ -707,6 +802,7 @@
           <span id="arp-mode-val">Fixed Interval</span>
           <span id="arp-count-val">Refreshes: 0</span>
         </div>
+        <div class="arp-monitor-term" id="arp-monitor-term" hidden></div>
         <button class="arp-btn arp-btn-sound" id="arp-enable-sound-btn">🔊 Enable Alert Sound</button>
         <div class="arp-actions">
           <button class="arp-btn arp-btn-danger" id="arp-stop-btn">Stop Refresh</button>
@@ -716,6 +812,7 @@
 
     overlayShadow.appendChild(style);
     overlayShadow.appendChild(widget);
+    updateOverlayMonitorTerm();
 
     const targetParent = document.body || document.documentElement;
     if (targetParent) {
@@ -860,6 +957,19 @@
         ? `Random (${currentTabState.minInterval}-${currentTabState.maxInterval}s)`
         : `Every ${currentTabState.interval}s`;
     }
+    updateOverlayMonitorTerm();
+  }
+
+  function updateOverlayMonitorTerm() {
+    if (!overlayShadow) return;
+    const term = overlayShadow.querySelector('#arp-monitor-term');
+    if (!term) return;
+    const monitoredText = currentTabState && currentTabState.monitorEnabled
+      ? String(currentTabState.targetText || '').trim()
+      : '';
+    term.hidden = !monitoredText;
+    term.textContent = monitoredText ? `Monitoring: “${monitoredText}”` : '';
+    term.title = monitoredText;
   }
 
   let isInteractionListenerAttached = false;

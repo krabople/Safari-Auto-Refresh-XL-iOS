@@ -37,7 +37,6 @@
       <button class="nav-tab active" data-tab="tab-timer">Timer</button>
       <button class="nav-tab" data-tab="tab-monitor">Monitor</button>
       <button class="nav-tab" data-tab="tab-autostart">Auto-Start</button>
-      <button class="nav-tab" data-tab="tab-support">Support</button>
     </nav>
 
     <!-- Tab Content Area -->
@@ -136,6 +135,19 @@
         </div>
       </section>
 
+      <!-- AUTO-START TAB -->
+      <section class="tab-pane" id="tab-autostart">
+        <div class="autostart-card">
+          <h4>Auto-Start Exact Page</h4>
+          <p>Automatically start auto-refreshing only when you visit this exact page URL.</p>
+          <button class="btn-secondary" id="btnAddCurrentPage">+ Auto-Start Current Page</button>
+          <small id="autoStartResult" class="support-note" role="status" aria-live="polite"></small>
+        </div>
+        <div class="autostart-footer">
+          <button class="btn-link" id="btnOpenOptions">Open Advanced Options & Rules &rarr;</button>
+        </div>
+      </section>
+
       <!-- PAGE MONITOR TAB -->
       <section class="tab-pane" id="tab-monitor">
         <div class="form-group">
@@ -199,41 +211,6 @@
         </div>
       </section>
 
-      <!-- AUTO-START TAB -->
-      <section class="tab-pane" id="tab-autostart">
-        <div class="autostart-card">
-          <h4>Auto-Start URL Rule</h4>
-          <p>Automatically start auto-refreshing whenever you visit specific domain patterns.</p>
-          <button class="btn-secondary" id="btnAddCurrentDomain">+ Auto-Start Current Page</button>
-        </div>
-        <div class="autostart-footer">
-          <button class="btn-link" id="btnOpenOptions">Open Advanced Options & Rules &rarr;</button>
-        </div>
-      </section>
-
-      <!-- SUPPORT TAB -->
-      <section class="tab-pane" id="tab-support">
-        <div class="support-card">
-          <div class="support-card-header">
-            <svg class="support-icon" viewBox="0 0 24 24">
-              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-            </svg>
-            <h4>Bug Fixes & Feedback</h4>
-          </div>
-          <p>Have suggestions for improvement or found a bug? Email directly to:</p>
-          <a href="mailto:krabople@gmail.com" id="linkEmail" class="email-badge">krabople@gmail.com</a>
-        </div>
-
-        <div class="support-card review-card">
-          <div class="support-card-header">
-            <span class="star-emoji">⭐</span>
-            <h4>Rate & Review</h4>
-          </div>
-          <p>Enjoying <strong>Auto Refresh XL</strong>? Please consider leaving a review!</p>
-          <button class="btn-secondary" id="btnReview" data-app-store-id="">⭐ Leave a Review</button>
-          <small id="reviewAvailability" class="support-note"></small>
-        </div>
-      </section>
     </main>
   </div>
 

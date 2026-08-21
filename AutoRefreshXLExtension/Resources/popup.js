@@ -31,17 +31,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const actHighlight = document.getElementById('actHighlight');
   const actScroll = document.getElementById('actScroll');
   const actFocus = document.getElementById('actFocus');
-
-  const btnAddCurrentDomain = document.getElementById('btnAddCurrentDomain');
+  const btnAddCurrentPage = document.getElementById('btnAddCurrentPage');
   const btnOpenOptions = document.getElementById('btnOpenOptions');
-  const linkEmail = document.getElementById('linkEmail');
-  const btnReview = document.getElementById('btnReview');
-  const reviewAvailability = document.getElementById('reviewAvailability');
+  const autoStartResult = document.getElementById('autoStartResult');
 
   let currentTabId = null;
   let activeState = null;
   let draftReady = false;
   let popupDraftCache = {};
+  let targetWasEmpty = true;
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -112,7 +110,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (targetText && toggleMonitor) {
     targetText.addEventListener('input', () => {
-      toggleMonitor.checked = targetText.value.trim().length > 0;
+      const targetIsEmpty = targetText.value.trim().length === 0;
+      if (targetIsEmpty) {
+        toggleMonitor.checked = false;
+      } else if (targetWasEmpty) {
+        toggleMonitor.checked = true;
+      }
+      targetWasEmpty = targetIsEmpty;
     });
   }
 
@@ -137,7 +141,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     targetText.value = state.targetText || '';
-    toggleMonitor.checked = !!state.monitorEnabled || (targetText.value.trim().length > 0);
+    targetWasEmpty = targetText.value.trim().length === 0;
+    toggleMonitor.checked = !!state.monitorEnabled;
     matchType.value = state.matchType || 'text';
     conditionType.value = state.condition || 'appears';
     actStop.checked = state.actionStop !== false;
@@ -186,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       hardRefresh: toggleHardRefresh.checked,
       overlayEnabled: toggleOverlay.checked,
       stopOnInteraction: toggleStopOnInteraction.checked,
-      monitorEnabled: toggleMonitor.checked || targetText.value.trim().length > 0,
+      monitorEnabled: toggleMonitor.checked,
       targetText: targetText.value,
       matchType: matchType.value,
       condition: conditionType.value,
@@ -233,11 +238,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const minSec = parseInt(inputMinSec.value, 10) || 5;
       const maxSec = parseInt(inputMaxSec.value, 10) || 15;
 
-      const hasTarget = targetText && targetText.value.trim().length > 0;
-      if (hasTarget && toggleMonitor) {
-        toggleMonitor.checked = true;
-      }
-
       const statePayload = {
         enabled: true,
         mode: isRandom ? 'random' : 'fixed',
@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlayEnabled: toggleOverlay.checked,
         stopOnInteraction: toggleStopOnInteraction.checked,
 
-        monitorEnabled: (toggleMonitor && toggleMonitor.checked) || hasTarget,
+        monitorEnabled: !!(toggleMonitor && toggleMonitor.checked),
         targetText: targetText ? targetText.value.trim() : '',
         matchType: matchType ? matchType.value : 'text',
         condition: conditionType ? conditionType.value : 'appears',
@@ -283,61 +283,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  btnAddCurrentDomain.addEventListener('click', async () => {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const currentTab = (tabs && tabs[0]) ? tabs[0] : null;
-    if (!currentTab || !currentTab.url) return;
-    try {
-      const urlObj = new URL(currentTab.url);
-      const pattern = `*://${urlObj.hostname}/*`;
-      const { autoStartRules } = await chrome.storage.local.get(['autoStartRules']);
-      const rules = autoStartRules || [];
-      const exists = rules.some(r => r.pattern === pattern);
-      if (!exists) {
-        rules.push({
-          pattern: pattern,
-          enabled: true,
-          settings: {
-            interval: getSelectedIntervalSeconds(),
-            mode: toggleRandom.checked ? 'random' : 'fixed',
-            minInterval: parseInt(inputMinSec.value, 10) || 5,
-            maxInterval: parseInt(inputMaxSec.value, 10) || 15
-          }
-        });
-        await chrome.storage.local.set({ autoStartRules: rules });
-        alert(`Added ${pattern} to Auto-Start Rules!`);
-      } else {
-        alert(`${pattern} is already in your Auto-Start Rules.`);
+  if (btnAddCurrentPage) {
+    btnAddCurrentPage.addEventListener('click', async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const currentTab = tabs && tabs[0];
+      if (!currentTab || !currentTab.url || !/^https?:/i.test(currentTab.url)) {
+        if (autoStartResult) autoStartResult.textContent = 'This Safari page cannot be added to Auto-Start.';
+        return;
       }
-    } catch (e) {
-      alert('Could not add invalid or special browser URL.');
-    }
-  });
 
-  btnOpenOptions.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
+      const exactUrl = currentTab.url;
+      const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
+      const exists = autoStartRules.some(rule =>
+        rule && rule.enabled !== false &&
+        ((rule.urlMatch === 'exact' && rule.pattern === exactUrl) || rule.exactUrl === exactUrl)
+      );
 
-  if (linkEmail) {
-    linkEmail.addEventListener('click', (e) => {
-      e.preventDefault();
-      chrome.tabs.create({ url: 'mailto:krabople@gmail.com' });
+      if (exists) {
+        if (autoStartResult) autoStartResult.textContent = '✓ This exact page is already in Auto-Start.';
+        return;
+      }
+
+      autoStartRules.push({
+        pattern: exactUrl,
+        exactUrl,
+        urlMatch: 'exact',
+        enabled: true,
+        settings: collectDraft()
+      });
+      await chrome.storage.local.set({ autoStartRules });
+      if (autoStartResult) {
+        autoStartResult.textContent = '✓ Exact page added to Auto-Start.';
+        autoStartResult.style.color = '#4ade80';
+      }
     });
   }
 
-  if (btnReview) {
-    const appStoreId = (btnReview.dataset.appStoreId || '').trim();
-    if (/^\d+$/.test(appStoreId)) {
-      btnReview.addEventListener('click', () => {
-        chrome.tabs.create({ url: `https://apps.apple.com/app/id${appStoreId}?action=write-review` });
-      });
-    } else {
-      btnReview.disabled = true;
-      btnReview.textContent = '⭐ Reviews Available After Release';
-      if (reviewAvailability) {
-        reviewAvailability.textContent = 'The direct review link will activate when the App Store assigns this app its numeric ID.';
-      }
-    }
+  if (btnOpenOptions) {
+    btnOpenOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
   }
 
   const btnTestSound = document.getElementById('btnTestSound');

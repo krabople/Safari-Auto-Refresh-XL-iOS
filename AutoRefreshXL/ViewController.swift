@@ -98,7 +98,7 @@ class ViewController: UIViewController {
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
         let openSettingsBtn = UIButton(type: .system)
-        openSettingsBtn.setTitle("⚙️ Open Safari Settings", for: .normal)
+        openSettingsBtn.setTitle("⚙️ Open Extension Settings Guide", for: .normal)
         openSettingsBtn.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .bold)
         openSettingsBtn.setTitleColor(.black, for: .normal)
         openSettingsBtn.backgroundColor = UIColor(red: 0/255, green: 242/255, blue: 254/255, alpha: 1.0)
@@ -120,8 +120,8 @@ class ViewController: UIViewController {
         stepsStack.translatesAutoresizingMaskIntoConstraints = false
         
         let steps = [
-            ("1", "Open iOS Settings App", "Tap 'Safari' in the main settings list."),
-            ("2", "Navigate to Extensions", "Tap 'Extensions' under the General Safari settings."),
+            ("1", "Open iOS Settings App", "Tap 'Apps', then tap 'Safari'."),
+            ("2", "Navigate to Extensions", "Tap 'Extensions' in Safari settings."),
             ("3", "Turn ON Extension", "Select 'Safari Auto Refresh and Page Monitor XL' and toggle it ON."),
             ("4", "Grant Website Permissions", "Tap 'Permissions' ➔ 'All Websites' ➔ Select 'Allow'."),
             ("5", "Launch in Safari", "Open Safari, visit any page, tap the 'aA' icon in the URL bar, and select 'Auto Refresh XL'!")
@@ -287,9 +287,18 @@ class ViewController: UIViewController {
     }
 
     @objc private func openSettingsTapped() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }
+        let alert = UIAlertController(
+            title: "Enable the Safari Extension",
+            message: "Apple does not provide apps with a direct link to an individual Safari extension setting. In Settings, go back to Apps → Safari → Extensions, then select Safari Auto Refresh and Page Monitor XL and allow it on websites.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+        })
+        present(alert, animated: true)
     }
 
 }

@@ -229,25 +229,43 @@ async function updateActiveTabBadge() {
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
-    const { autoStartRules } = await chrome.storage.local.get(['autoStartRules']);
-    if (autoStartRules && Array.isArray(autoStartRules)) {
+    const refreshedState = activeTabStates[tabId];
+    const hadPendingDetection = !!(refreshedState && refreshedState.pendingDetection);
+    if (refreshedState && refreshedState.pendingDetection) {
+      const pending = refreshedState.pendingDetection;
+      const result = await requestFromTab(tabId, {
+        type: 'APPLY_DETECTED_PAGE_ACTIONS',
+        targetText: pending.targetText,
+        matchType: pending.matchType,
+        state: refreshedState
+      });
+      if (result && result.success) {
+        delete refreshedState.pendingDetection;
+        saveTabStates();
+      }
+    }
+
+    if (!hadPendingDetection) {
+      const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
       for (const rule of autoStartRules) {
-        if (!rule.enabled || !rule.pattern) continue;
-        let match = false;
-        try {
-          const regex = new RegExp(rule.pattern.replace(/\*/g, '.*'), 'i');
-          match = regex.test(tab.url);
-        } catch (e) {
-          match = tab.url.includes(rule.pattern);
+        if (!rule || rule.enabled === false || !rule.pattern) continue;
+        let matches = false;
+        if (rule.urlMatch === 'exact' || rule.exactUrl) {
+          matches = tab.url === (rule.exactUrl || rule.pattern);
+        } else {
+          try {
+            const regex = new RegExp(rule.pattern.replace(/\*/g, '.*'), 'i');
+            matches = regex.test(tab.url);
+          } catch (error) {
+            matches = tab.url.includes(rule.pattern);
+          }
         }
 
-        if (match && (!activeTabStates[tabId] || !activeTabStates[tabId].enabled)) {
+        if (matches && (!activeTabStates[tabId] || !activeTabStates[tabId].enabled)) {
           const newState = Object.assign({}, DEFAULT_TAB_STATE, rule.settings || {}, {
             enabled: true,
-            nextRefreshTime: Date.now() + ((rule.settings && rule.settings.interval) || 10) * 1000,
             refreshCount: 0
           });
-
           activeTabStates[tabId] = newState;
           saveTabStates();
           scheduleNextRefresh(tabId);
@@ -257,6 +275,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         }
       }
     }
+
   }
 });
 
@@ -409,6 +428,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'FOCUS_MONITORED_TAB') {
+    const tabId = Number(request.tabId);
+    if (!tabId) {
+      sendResponse({ success: false, error: 'No monitored tab was supplied' });
+      return true;
+    }
+    chrome.tabs.update(tabId, { active: true })
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
   if (request.type === 'TARGET_DETECTED') {
     const tabId = request.tabId || senderTabId || targetTabId;
     const state = tabId ? activeTabStates[tabId] : null;
@@ -427,6 +458,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           type: 'PRESENT_TARGET_ALERT',
           targetText: targetTxt,
           sourceTabId: tabId,
+          showOpenTabButton: !!tabId && activeTab.id !== tabId,
           playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
         });
         if (result && result.success) return result;
@@ -438,6 +470,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: 'PRESENT_TARGET_ALERT',
             targetText: targetTxt,
             sourceTabId: tabId,
+            showOpenTabButton: false,
             playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
           });
         }
@@ -448,6 +481,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
 
     if (state) {
+      state.pendingDetection = {
+        targetText: targetTxt,
+        matchType: state.matchType || 'text'
+      };
+      saveTabStates();
       if (state.actionStop) {
         state.enabled = false;
         saveTabStates();
