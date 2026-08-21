@@ -228,7 +228,7 @@ final class ViewController: UIViewController {
         FeatureGuide(icon: "arrow.clockwise", title: "Refresh options and limits", summary: "Hard refresh, limits, and interaction safety", sections: [
             GuideSection(title: "Hard Refresh", body: "Requests a reload that bypasses cached data where Safari supports it. Websites and service workers may still impose their own caching."),
             GuideSection(title: "Refresh Limit", body: "A positive number stops after that many cycles; zero is unlimited. The overlay shows the count."),
-            GuideSection(title: "Stop on interaction", body: "Stops when you interact with the monitored webpage. Overlay controls are excluded so they remain usable.")]),
+            GuideSection(title: "Stop on interaction", body: "Stops refreshing when you interact with the monitored webpage. Use this when you want a tap, click, key press, or other page interaction to end the active refresh session.")]),
         FeatureGuide(icon: "rectangle.inset.filled", title: "On-page overlay", summary: "Countdown, monitored term, and controls", sections: [
             GuideSection(title: "What it shows", body: "The draggable overlay shows countdown, refresh count, fixed or random mode, monitored term, Stop Refresh, and the sound toggle when monitoring uses sound."),
             GuideSection(title: "Moving and hiding", body: "Drag its header. Closing the widget hides it; use Stop Refresh to end the process."),

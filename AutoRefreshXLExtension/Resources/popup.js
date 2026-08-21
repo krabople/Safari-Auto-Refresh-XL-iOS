@@ -233,8 +233,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (chrome.runtime.lastError || !response || !response.success) {
         updateActiveStatus(false);
         alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
-      } else if (!response.pageReady) {
-        alert('The refresh timer started, but Safari has not injected the page controls yet. Reload this webpage once, then start again so the overlay and monitor can attach.');
       } else {
         setTimeout(() => window.close(), 80);
       }

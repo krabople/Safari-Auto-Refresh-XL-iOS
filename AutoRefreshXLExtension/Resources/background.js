@@ -312,13 +312,16 @@ async function sendToTab(tabId, message) {
     await chrome.tabs.sendMessage(tabId, message);
     return true;
   } catch (error) {
-    if (error.message && (error.message.includes('Tab not found') || error.message.includes('Could not establish connection') || error.message.includes('Invalid call'))) {
+    if (error.message && error.message.includes('Tab not found')) {
       if (activeTabStates[tabId]) {
         delete activeTabStates[tabId];
         saveTabStates();
         if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
       }
     } else {
+      // Safari can briefly report no content-script connection while a newly
+      // opened tab is still being prepared. Keep the refresh state; subsequent
+      // countdown ticks will attach the page controls when injection completes.
       addLog('PAGE', `Could not deliver ${message.type} to tab ${tabId}: ${error.message}`, 'warn');
     }
     return false;
