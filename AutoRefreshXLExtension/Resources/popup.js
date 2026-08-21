@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inputSeconds = document.getElementById('inputSeconds');
   const toggleRandom = document.getElementById('toggleRandom');
   const randomInputs = document.getElementById('randomInputs');
+  const presetIntervalControls = document.getElementById('presetIntervalControls');
+  const customDurationControls = document.getElementById('customDurationControls');
   const inputMinSec = document.getElementById('inputMinSec');
   const inputMaxSec = document.getElementById('inputMaxSec');
   const inputMaxRefreshes = document.getElementById('inputMaxRefreshes');
@@ -35,7 +37,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnOpenOptions = document.getElementById('btnOpenOptions');
   const linkEmail = document.getElementById('linkEmail');
   const btnReview = document.getElementById('btnReview');
-  const btnDonate = document.getElementById('btnDonate');
+  const reviewAvailability = document.getElementById('reviewAvailability');
+  const soundStartDialog = document.getElementById('soundStartDialog');
+  const btnPrepareSound = document.getElementById('btnPrepareSound');
+  const btnStartWithoutSound = document.getElementById('btnStartWithoutSound');
+  const btnCancelStart = document.getElementById('btnCancelStart');
 
   let currentTabId = null;
   let activeState = null;
@@ -92,13 +98,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  toggleRandom.addEventListener('change', () => {
-    if (toggleRandom.checked) {
-      randomInputs.classList.remove('hidden');
-    } else {
-      randomInputs.classList.add('hidden');
-    }
-  });
+  function updateRandomModeUI() {
+    const isRandom = toggleRandom.checked;
+    randomInputs.classList.toggle('hidden', !isRandom);
+
+    [presetIntervalControls, customDurationControls].forEach(group => {
+      if (!group) return;
+      group.classList.toggle('interval-controls-disabled', isRandom);
+      group.setAttribute('aria-disabled', String(isRandom));
+      group.querySelectorAll('button, input').forEach(control => {
+        control.disabled = isRandom;
+      });
+    });
+  }
+
+  toggleRandom.addEventListener('change', updateRandomModeUI);
 
   if (targetText && toggleMonitor) {
     targetText.addEventListener('input', () => {
@@ -113,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inputSeconds.value = intervalSec % 60;
 
     toggleRandom.checked = state.mode === 'random';
-    if (toggleRandom.checked) randomInputs.classList.remove('hidden');
+    updateRandomModeUI();
 
     inputMinSec.value = state.minInterval || 5;
     inputMaxSec.value = state.maxInterval || 15;
@@ -167,14 +181,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Math.max(1, total);
   }
 
-  startStopBtn.addEventListener('click', () => {
+  function getAudioStatus() {
+    if (!currentTabId) return Promise.resolve({ unlocked: false });
+    return chrome.tabs.sendMessage(currentTabId, { type: 'GET_AUDIO_STATUS' })
+      .catch(() => ({ unlocked: false }));
+  }
+
+  function askAboutSound() {
+    return new Promise(resolve => {
+      soundStartDialog.classList.remove('hidden');
+
+      const finish = choice => {
+        soundStartDialog.classList.add('hidden');
+        btnPrepareSound.onclick = null;
+        btnStartWithoutSound.onclick = null;
+        btnCancelStart.onclick = null;
+        resolve(choice);
+      };
+
+      btnPrepareSound.onclick = () => finish('prepare');
+      btnStartWithoutSound.onclick = () => finish('continue');
+      btnCancelStart.onclick = () => finish('cancel');
+    });
+  }
+
+  function startRefresh(statePayload) {
+    updateActiveStatus(true);
+    chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success) {
+        updateActiveStatus(false);
+        alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
+      } else if (!response.pageReady) {
+        alert('The refresh timer started, but Safari has not injected the page controls yet. Reload this webpage once, then start again so the overlay and monitor can attach.');
+      }
+    });
+  }
+
+  startStopBtn.addEventListener('click', async () => {
     const isActive = statusDot.classList.contains('active');
 
     if (isActive) {
       updateActiveStatus(false);
       chrome.runtime.sendMessage({ type: 'STOP_REFRESH', tabId: currentTabId });
     } else {
-      updateActiveStatus(true);
       const intervalSec = getSelectedIntervalSeconds();
       const isRandom = toggleRandom.checked;
       const minSec = parseInt(inputMinSec.value, 10) || 5;
@@ -202,20 +251,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         condition: conditionType ? conditionType.value : 'appears',
         actionStop: actStop ? actStop.checked : true,
         actionSound: actSound ? actSound.checked : true,
+        soundEnabled: true,
         actionNotify: actNotify ? actNotify.checked : true,
         actionHighlight: actHighlight ? actHighlight.checked : true,
         actionScroll: actScroll ? actScroll.checked : true,
         actionFocus: actFocus ? actFocus.checked : false
       };
 
-      chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (response) => {
-        if (chrome.runtime.lastError || !response || !response.success) {
-          updateActiveStatus(false);
-          alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
-        } else if (!response.pageReady) {
-          alert('The refresh timer started, but Safari has not injected the page controls yet. Reload this webpage once, then start again so the overlay and monitor can attach.');
+      if (statePayload.monitorEnabled && statePayload.actionSound) {
+        const audioStatus = await getAudioStatus();
+        if (!audioStatus || !audioStatus.unlocked) {
+          const choice = await askAboutSound();
+          if (choice === 'cancel') return;
+          if (choice === 'prepare') {
+            try {
+              await chrome.tabs.sendMessage(currentTabId, { type: 'SHOW_PRESTART_SOUND_CONTROL' });
+              alert('Return to the webpage and tap “Enable and Test Sound”. Then open the extension and press Start Refresh again.');
+            } catch (error) {
+              alert('The sound control could not be added to this page. Safari may not allow extensions on it.');
+            }
+            return;
+          }
         }
-      });
+      }
+
+      startRefresh(statePayload);
     }
   });
 
@@ -279,62 +339,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (btnReview) {
-    btnReview.addEventListener('click', () => {
-      alert('Open Safari Extensions on App Store to leave a review!');
-    });
-  }
-
-  if (btnDonate) {
-    btnDonate.addEventListener('click', () => {
-      chrome.tabs.create({ url: 'https://buymeacoffee.com/krabople' });
-    });
-  }
-
-  function getChimeAudioURI() {
-    try {
-      const sampleRate = 11025;
-      const numSamples = Math.floor(sampleRate * 0.45);
-      const buffer = new Uint8Array(44 + numSamples);
-      buffer[0] = 82; buffer[1] = 73; buffer[2] = 70; buffer[3] = 70;
-      const fileSize = 36 + numSamples;
-      buffer[4] = fileSize & 0xff; buffer[5] = (fileSize >> 8) & 0xff;
-      buffer[6] = (fileSize >> 16) & 0xff; buffer[7] = (fileSize >> 24) & 0xff;
-      buffer[8] = 87; buffer[9] = 65; buffer[10] = 86; buffer[11] = 69;
-      buffer[12] = 102; buffer[13] = 109; buffer[14] = 116; buffer[15] = 32;
-      buffer[16] = 16; buffer[17] = 0; buffer[18] = 0; buffer[19] = 0;
-      buffer[20] = 1; buffer[21] = 0; buffer[22] = 1; buffer[23] = 0;
-      buffer[24] = sampleRate & 0xff; buffer[25] = (sampleRate >> 8) & 0xff;
-      buffer[26] = 0; buffer[27] = 0;
-      buffer[28] = sampleRate & 0xff; buffer[29] = (sampleRate >> 8) & 0xff;
-      buffer[30] = 0; buffer[31] = 0;
-      buffer[32] = 1; buffer[33] = 0; buffer[34] = 8; buffer[35] = 0;
-      buffer[36] = 100; buffer[37] = 97; buffer[38] = 116; buffer[39] = 97;
-      buffer[40] = numSamples & 0xff; buffer[41] = (numSamples >> 8) & 0xff;
-      buffer[42] = (numSamples >> 16) & 0xff; buffer[43] = (numSamples >> 24) & 0xff;
-
-      for (let i = 0; i < numSamples; i++) {
-        const t = i / sampleRate;
-        const freq = i < numSamples * 0.5 ? 880 : 1320;
-        const sample = Math.sin(2 * Math.PI * freq * t);
-        const decay = 1 - (i / numSamples);
-        buffer[44 + i] = Math.floor(128 + sample * 110 * decay);
+    const appStoreId = (btnReview.dataset.appStoreId || '').trim();
+    if (/^\d+$/.test(appStoreId)) {
+      btnReview.addEventListener('click', () => {
+        chrome.tabs.create({ url: `https://apps.apple.com/app/id${appStoreId}?action=write-review` });
+      });
+    } else {
+      btnReview.disabled = true;
+      btnReview.textContent = '⭐ Reviews Available After Release';
+      if (reviewAvailability) {
+        reviewAvailability.textContent = 'The direct review link will activate when the App Store assigns this app its numeric ID.';
       }
-
-      let binary = '';
-      for (let i = 0; i < buffer.byteLength; i++) {
-        binary += String.fromCharCode(buffer[i]);
-      }
-      return 'data:audio/wav;base64,' + btoa(binary);
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function playPopupSound() {
-    const uri = getChimeAudioURI();
-    if (uri) {
-      const audio = new Audio(uri);
-      audio.play().catch(e => console.warn('Popup audio play error:', e));
     }
   }
 
@@ -354,87 +369,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const logConsoleContainer = document.getElementById('logConsoleContainer');
-  const btnClearLogs = document.getElementById('btnClearLogs');
-  const btnTestSoundLogs = document.getElementById('btnTestSoundLogs');
-  const btnTestPushLogs = document.getElementById('btnTestPushLogs');
-
-  function renderLogs() {
-    if (!logConsoleContainer) return;
-    chrome.runtime.sendMessage({ type: 'GET_LOGS' }, (response) => {
-      if (chrome.runtime.lastError || !response || !response.logs) return;
-      const logs = response.logs;
-      if (logs.length === 0) {
-        logConsoleContainer.innerHTML = '<div style="color: #64748b; font-style: italic;">No activity logged yet.</div>';
-        return;
-      }
-      logConsoleContainer.innerHTML = logs.map(entry => {
-        const colorClass = entry.type === 'error' ? '#f87171' : entry.type === 'success' ? '#4ade80' : entry.type === 'warn' ? '#fbbf24' : '#38bdf8';
-        return `<div style="line-height: 1.3;"><span style="color: #64748b;">[${entry.timestamp}]</span> <strong style="color: ${colorClass};">[${entry.category}]</strong> ${escapeHTML(entry.message)}</div>`;
-      }).join('');
-      logConsoleContainer.scrollTop = logConsoleContainer.scrollHeight;
-    });
-  }
-
-  function escapeHTML(str) {
-    return (str || '').replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
-  }
-
-  if (btnClearLogs) {
-    btnClearLogs.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'CLEAR_LOGS' }, () => {
-        renderLogs();
-      });
-    });
-  }
-
-  if (btnTestSoundLogs) {
-    btnTestSoundLogs.addEventListener('click', () => {
-      playPopupSound();
-      if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { type: 'TEST_SOUND' }).catch(() => {});
-      }
-    });
-  }
-
-  if (btnTestPushLogs) {
-    btnTestPushLogs.addEventListener('click', () => {
-      const result = document.getElementById('pushTestResult');
-      btnTestPushLogs.disabled = true;
-      btnTestPushLogs.textContent = 'Testing…';
-      if (result) {
-        result.className = 'push-test-result';
-        result.textContent = '';
-      }
-
-      chrome.runtime.sendMessage({ type: 'TEST_NATIVE_ALERT' }, (response) => {
-        const runtimeError = chrome.runtime.lastError;
-        const succeeded = !runtimeError && response && response.success === true;
-        const message = runtimeError
-          ? runtimeError.message
-          : (response && response.error) || 'The native notification did not return a result.';
-
-        if (result) {
-          result.className = `push-test-result ${succeeded ? 'is-success' : 'is-error'}`;
-          result.textContent = succeeded
-            ? 'Notification request sent successfully.'
-            : `Notification failed: ${message}`;
-        }
-
-        btnTestPushLogs.disabled = false;
-        btnTestPushLogs.textContent = '📲 Test Push Alert';
-        renderLogs();
-      });
-    });
-  }
-
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-      if (e.target.getAttribute('data-tab') === 'tab-logs') {
-        renderLogs();
-      }
-    });
-  });
-
-  setInterval(renderLogs, 1500);
 });

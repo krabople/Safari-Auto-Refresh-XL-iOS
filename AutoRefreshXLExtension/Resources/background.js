@@ -108,6 +108,7 @@ const DEFAULT_TAB_STATE = {
   condition: 'appears',
   actionStop: true,
   actionSound: true,
+  soundEnabled: true,
   actionNotify: true,
   actionHighlight: true,
   actionScroll: true,
@@ -446,6 +447,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'SET_SOUND_ENABLED') {
+    const tabId = request.tabId || senderTabId || targetTabId;
+    if (tabId && activeTabStates[tabId]) {
+      activeTabStates[tabId].soundEnabled = request.enabled !== false;
+      saveTabStates();
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.type === 'TEST_NATIVE_ALERT') {
     addLog('TEST', 'User clicked Test Push Alert button in popup');
     triggerNativeAlert('Test Alert', { playSound: true, showNotification: true })
@@ -460,10 +471,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
-    const nativeAlertPromise = triggerNativeAlert(targetTxt, {
-      playSound: !state || state.actionSound !== false,
-      showNotification: !state || state.actionNotify !== false
-    });
+    const presentOnActiveTab = async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const activeTab = tabs && tabs[0];
+        if (!activeTab || !activeTab.id) {
+          return { success: false, error: 'No active Safari tab was found' };
+        }
+        const result = await requestFromTab(activeTab.id, {
+          type: 'PRESENT_TARGET_ALERT',
+          targetText: targetTxt,
+          sourceTabId: tabId,
+          playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
+        });
+        if (result && result.success) return result;
+
+        // Safari internal pages do not accept content scripts. Fall back to the
+        // monitored tab so the alert is not lost completely.
+        if (tabId && tabId !== activeTab.id) {
+          return await requestFromTab(tabId, {
+            type: 'PRESENT_TARGET_ALERT',
+            targetText: targetTxt,
+            sourceTabId: tabId,
+            playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
+          });
+        }
+        return { success: false, error: (result && result.error) || 'The active tab could not present the alert' };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    };
 
     if (state) {
       if (state.actionStop) {
@@ -477,16 +514,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         addLog('TARGET', `Auto-refresh stopped for tab ${tabId} because target was detected`);
       }
 
-      if (state.actionFocus && tabId) {
-        chrome.tabs.get(tabId, (tab) => {
-          if (tab) {
-            chrome.tabs.update(tabId, { active: true });
-          }
-        });
-      }
     }
 
-    nativeAlertPromise.then(sendResponse);
+    presentOnActiveTab().then(sendResponse);
     return true;
   }
 

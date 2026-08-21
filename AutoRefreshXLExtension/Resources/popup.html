@@ -36,7 +36,6 @@
     <nav class="nav-tabs">
       <button class="nav-tab active" data-tab="tab-timer">Timer</button>
       <button class="nav-tab" data-tab="tab-monitor">Monitor</button>
-      <button class="nav-tab" data-tab="tab-logs">Logs</button>
       <button class="nav-tab" data-tab="tab-autostart">Auto-Start</button>
       <button class="nav-tab" data-tab="tab-support">Support</button>
     </nav>
@@ -46,7 +45,7 @@
       <!-- TIMER TAB -->
       <section class="tab-pane active" id="tab-timer">
         <!-- Preset Interval Chips -->
-        <div class="form-group">
+        <div class="form-group" id="presetIntervalControls">
           <label class="form-label">Preset Intervals</label>
           <div class="preset-chips">
             <button class="chip" data-seconds="5">5s</button>
@@ -59,7 +58,7 @@
         </div>
 
         <!-- Custom Duration Inputs -->
-        <div class="form-group">
+        <div class="form-group" id="customDurationControls">
           <label class="form-label">Custom Duration</label>
           <div class="time-inputs">
             <div class="time-field">
@@ -200,37 +199,6 @@
         </div>
       </section>
 
-      <!-- LOGS TAB -->
-      <section class="tab-pane" id="tab-logs">
-        <div class="form-group">
-          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>📋 Activity & Diagnostic Log</span>
-            <button class="btn-link" id="btnClearLogs" style="font-size: 11px;">Clear Logs</button>
-          </label>
-          <div id="logConsoleContainer" style="
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(0, 242, 254, 0.2);
-            border-radius: 10px;
-            padding: 10px;
-            height: 180px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 11px;
-            color: #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-          ">
-            <div style="color: #64748b; font-style: italic;">No activity logged yet.</div>
-          </div>
-        </div>
-        <div class="form-group" style="display: flex; gap: 8px;">
-          <button type="button" class="btn-secondary" id="btnTestSoundLogs" style="flex: 1;">🔊 Test Sound</button>
-          <button type="button" class="btn-secondary" id="btnTestPushLogs" style="flex: 1;">📲 Test Push Alert</button>
-        </div>
-        <div id="pushTestResult" class="push-test-result" role="status" aria-live="polite"></div>
-      </section>
-
       <!-- AUTO-START TAB -->
       <section class="tab-pane" id="tab-autostart">
         <div class="autostart-card">
@@ -243,7 +211,7 @@
         </div>
       </section>
 
-      <!-- SUPPORT & DONATE TAB -->
+      <!-- SUPPORT TAB -->
       <section class="tab-pane" id="tab-support">
         <div class="support-card">
           <div class="support-card-header">
@@ -262,19 +230,21 @@
             <h4>Rate & Review</h4>
           </div>
           <p>Enjoying <strong>Auto Refresh XL</strong>? Please consider leaving a review!</p>
-          <button class="btn-secondary" id="btnReview">⭐ Leave a Review</button>
-        </div>
-
-        <div class="support-card donate-card">
-          <div class="support-card-header">
-            <span class="coffee-emoji">☕</span>
-            <h4>Support Development</h4>
-          </div>
-          <p>Enjoying <strong>Auto Refresh XL</strong>? If it saved you time or helped you out, consider supporting independent development!</p>
-          <button class="btn-donate" id="btnDonate">☕ Buy Me a Coffee</button>
+          <button class="btn-secondary" id="btnReview" data-app-store-id="">⭐ Leave a Review</button>
+          <small id="reviewAvailability" class="support-note"></small>
         </div>
       </section>
     </main>
+  </div>
+
+  <div class="dialog-backdrop hidden" id="soundStartDialog" role="dialog" aria-modal="true" aria-labelledby="soundStartTitle">
+    <div class="dialog-card">
+      <h3 id="soundStartTitle">Enable audible alerts?</h3>
+      <p>iOS requires one tap inside the webpage before alert sounds can play. The refresh timer will not start until you choose.</p>
+      <button class="btn-secondary dialog-primary" id="btnPrepareSound">Enable Sound First</button>
+      <button class="btn-link" id="btnStartWithoutSound">Start Without Enabling</button>
+      <button class="btn-link dialog-cancel" id="btnCancelStart">Cancel</button>
+    </div>
   </div>
 
   <script src="popup.js"></script>

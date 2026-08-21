@@ -12,6 +12,7 @@
   let monitorObserver = null;
   let monitorCheckTimer = null;
   let audioUnlocked = false;
+  let soundAlertsEnabled = true;
   let preStartSoundHost = null;
   let preStartSoundShadow = null;
 
@@ -45,6 +46,10 @@
         audioUnlocked = context.state === 'running';
         updateSoundEnableControl();
         updatePreStartSoundControl();
+        if (audioUnlocked) {
+          window.removeEventListener('touchstart', unlockAudioOnTouch, true);
+          window.removeEventListener('click', unlockAudioOnTouch, true);
+        }
       };
       if (context.state === 'running') {
         markUnlocked();
@@ -52,8 +57,6 @@
         context.resume().then(markUnlocked).catch(() => {});
       }
     }
-    window.removeEventListener('touchstart', unlockAudioOnTouch, true);
-    window.removeEventListener('click', unlockAudioOnTouch, true);
   };
   window.addEventListener('touchstart', unlockAudioOnTouch, { capture: true, passive: true });
   window.addEventListener('click', unlockAudioOnTouch, { capture: true, passive: true });
@@ -61,6 +64,7 @@
   chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
     if (chrome.runtime.lastError || !response || !response.state) return;
     currentTabState = response.state;
+    soundAlertsEnabled = currentTabState.soundEnabled !== false;
 
     if (currentTabState.enabled) {
       initContentFeatures();
@@ -70,6 +74,7 @@
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'COUNTDOWN_TICK') {
       currentTabState = request.state;
+      soundAlertsEnabled = currentTabState.soundEnabled !== false;
       if (currentTabState && currentTabState.overlayEnabled && !overlayElement) {
         renderFloatingOverlay();
       }
@@ -77,12 +82,14 @@
       initContentFeatures();
     } else if (request.type === 'REFRESH_STARTED') {
       currentTabState = request.state;
+      soundAlertsEnabled = currentTabState.soundEnabled !== false;
       hasTriggeredTarget = false;
       getUnlockedAudioContext();
       removePreStartSoundControl();
       initContentFeatures();
     } else if (request.type === 'STATE_SYNC') {
       currentTabState = request.state;
+      soundAlertsEnabled = currentTabState.soundEnabled !== false;
       initContentFeatures();
     } else if (request.type === 'REFRESH_STOPPED') {
       if (currentTabState) currentTabState.enabled = false;
@@ -93,6 +100,13 @@
     } else if (request.type === 'SHOW_PRESTART_SOUND_CONTROL') {
       renderPreStartSoundControl();
       sendResponse({ success: true });
+    } else if (request.type === 'GET_AUDIO_STATUS') {
+      sendResponse({ unlocked: audioUnlocked && sharedAudioCtx && sharedAudioCtx.state === 'running' });
+    } else if (request.type === 'PRESENT_TARGET_ALERT') {
+      const shouldPlaySound = request.playSound !== false && soundAlertsEnabled && audioUnlocked;
+      if (shouldPlaySound) playAlertSound();
+      showTargetAlertBanner(request.targetText || 'Keyword');
+      sendResponse({ success: true, soundPlayed: shouldPlaySound });
     } else if (request.type === 'FETCH_MONITOR_CHECK') {
       currentTabState = request.state || currentTabState;
       fetchAndCheckCurrentPage()
@@ -245,26 +259,8 @@
       logDebug('HIGHLIGHT', '🔴 Highlight Error: ' + e.message, 'error');
     }
 
-    // 2. Play Audio Alert Chime
-    try {
-      if (currentTabState.actionSound !== false) {
-        logDebug('SOUND', 'Executing playAlertSound...');
-        playAlertSound();
-      }
-    } catch (e) {
-      logDebug('SOUND', '🔴 Sound Error: ' + e.message, 'error');
-    }
-
-    // 3. Show On-Screen Alert Banner
-    try {
-      logDebug('BANNER', 'Rendering target alert banner...');
-      showTargetAlertBanner(currentTabState.targetText);
-      logDebug('BANNER', '🟢 Alert banner rendered!', 'success');
-    } catch (e) {
-      logDebug('BANNER', '🔴 Banner Error: ' + e.message, 'error');
-    }
-
-    // 4. Auto-Scroll to Highlighted Element
+    // Presentation is routed by the background worker to whichever Safari tab
+    // the user is currently viewing. This source tab only performs page actions.
     try {
       const targetToScroll = isFetchedCopy ? null : (highlightedEl || matchedNode);
       if (targetToScroll && currentTabState.actionScroll !== false) {
@@ -523,7 +519,7 @@
     }
   }
 
-  function playAlertSound() {
+  async function playAlertSound() {
     logDebug('SOUND', 'Attempting audio playback (HTML5 Audio + Web Audio API)...');
 
     try {
@@ -546,11 +542,9 @@
       if (ctx) {
         logDebug('SOUND', 'Web AudioContext state: ' + ctx.state);
         if (ctx.state === 'suspended') {
-          ctx.resume().then(() => {
-            logDebug('SOUND', 'Web AudioContext resumed', 'success');
-          }).catch(e => {
-            logDebug('SOUND', '🔴 AudioContext resume Error: ' + e.message, 'error');
-          });
+          await ctx.resume();
+          audioUnlocked = ctx.state === 'running';
+          logDebug('SOUND', 'Web AudioContext resumed', 'success');
         }
         const now = ctx.currentTime;
         const osc1 = ctx.createOscillator();
@@ -710,6 +704,8 @@
         background: #0284c7;
         color: #ffffff;
         margin-bottom: 6px;
+        width: 100%;
+        box-sizing: border-box;
       }
       .arp-btn-sound.is-enabled {
         background: #15803d;
@@ -795,7 +791,7 @@
     document.addEventListener('mouseup', endDrag);
 
     overlayShadow.querySelector('#arp-close-widget').addEventListener('click', removeOverlay);
-    overlayShadow.querySelector('#arp-enable-sound-btn').addEventListener('click', enableAlertAudio);
+    overlayShadow.querySelector('#arp-enable-sound-btn').addEventListener('click', toggleAlertAudio);
     overlayShadow.querySelector('#arp-stop-btn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ type: 'STOP_REFRESH' }, removeOverlay);
     });
@@ -816,6 +812,7 @@
         await context.resume();
       }
       audioUnlocked = context.state === 'running';
+      soundAlertsEnabled = audioUnlocked;
       if (!audioUnlocked) {
         throw new Error('Safari did not unlock audio');
       }
@@ -832,6 +829,23 @@
     }
   }
 
+  async function toggleAlertAudio() {
+    if (audioUnlocked && soundAlertsEnabled) {
+      soundAlertsEnabled = false;
+      if (currentTabState) currentTabState.soundEnabled = false;
+      updateSoundEnableControl();
+      chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: false });
+      return;
+    }
+
+    soundAlertsEnabled = true;
+    if (currentTabState) currentTabState.soundEnabled = true;
+    await enableAlertAudio();
+    if (audioUnlocked) {
+      chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: true });
+    }
+  }
+
   function updateSoundEnableControl(failureText = '') {
     if (!overlayShadow) return;
     const button = overlayShadow.querySelector('#arp-enable-sound-btn');
@@ -843,9 +857,10 @@
     }
 
     button.style.display = 'block';
-    button.classList.toggle('is-enabled', audioUnlocked);
-    button.textContent = audioUnlocked
-      ? '✓ Alert Sound Enabled'
+    const isEnabled = audioUnlocked && soundAlertsEnabled;
+    button.classList.toggle('is-enabled', isEnabled);
+    button.textContent = isEnabled
+      ? '🔇 Disable Alert Sound'
       : (failureText || '🔊 Enable Alert Sound');
   }
 
