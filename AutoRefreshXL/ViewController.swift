@@ -99,13 +99,13 @@ final class ViewController: UIViewController {
         ])
         contentStack.addArrangedSubview(welcomeCard())
         contentStack.addArrangedSubview(foregroundNoticeCard())
-        contentStack.addArrangedSubview(settingsButton())
         contentStack.addArrangedSubview(setupCard())
-        contentStack.addArrangedSubview(supportButton())
         let heading = label("Complete Feature Guide", 21, .bold, AppTheme.primary); heading.accessibilityTraits = .header
         contentStack.addArrangedSubview(heading)
         contentStack.addArrangedSubview(label("Tap a feature for detailed instructions, limitations, and useful tips.", 13, .regular, AppTheme.secondary))
         for (index, feature) in Self.features.enumerated() { contentStack.addArrangedSubview(featureButton(feature, index)) }
+        contentStack.addArrangedSubview(settingsButton())
+        contentStack.addArrangedSubview(supportButton())
     }
 
     private func welcomeCard() -> UIView {
@@ -120,7 +120,7 @@ final class ViewController: UIViewController {
     }
 
     private func settingsButton() -> UIButton {
-        var config = UIButton.Configuration.filled(); config.title = "Open Extension Settings Guide"; config.image = UIImage(systemName: "gearshape.fill")
+        var config = UIButton.Configuration.filled(); config.title = "Auto Refresh XL Settings"; config.image = UIImage(systemName: "gearshape.fill")
         config.imagePadding = 8; config.baseBackgroundColor = AppTheme.cyan; config.baseForegroundColor = .black; config.cornerStyle = .medium
         let button = UIButton(configuration: config); button.heightAnchor.constraint(equalToConstant: 50).isActive = true
         button.addTarget(self, action: #selector(openSettingsGuide), for: .touchUpInside); return button
@@ -196,11 +196,8 @@ final class ViewController: UIViewController {
     }
 
     @objc private func openSettingsGuide() {
-        let alert = UIAlertController(title: "Enable Auto Refresh XL", message: "Go to Settings → Apps → Safari → Extensions → Safari Auto Refresh and Page Monitor XL. Turn on Allow Extension and allow website access. Apple does not provide an App Store-safe link directly to an individual extension switch.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel)); alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
-            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }); present(alert, animated: true)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 
     @objc private func contactSupport() {

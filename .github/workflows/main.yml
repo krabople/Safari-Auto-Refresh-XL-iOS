@@ -54,7 +54,13 @@ jobs:
           echo "Successfully injected native SafariWebExtensionHandler.swift at $HANDLER_PATH"
         fi
 
-        echo "=== 2c. Preserving Extension Entitlements for Native Messaging ==="
+        echo "=== 2c. Setting the installed display name ==="
+        find "$GITHUB_WORKSPACE/GeneratedProject" -name "Info.plist" -type f -print0 | while IFS= read -r -d '' PLIST_PATH; do
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Auto Refresh XL" "$PLIST_PATH" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$PLIST_PATH"
+        done
+
+        echo "=== 2d. Preserving Extension Entitlements for Native Messaging ==="
         # Do not wipe extension entitlements so RunningBoardServices can launch the extension plugin
 
         cd "$GITHUB_WORKSPACE"
@@ -92,6 +98,7 @@ jobs:
                    CODE_SIGN_IDENTITY="-" \
                    CODE_SIGNING_REQUIRED=NO \
                    AD_HOC_CODE_SIGNING_ALLOWED=YES \
+                   INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
                    build
 
         cd "$GITHUB_WORKSPACE"
