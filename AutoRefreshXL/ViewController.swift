@@ -22,6 +22,49 @@ private final class AppLogoView: UIView {
     }
 }
 
+private final class FeatureRowControl: UIControl {
+    init(feature: FeatureGuide) {
+        super.init(frame: .zero)
+        backgroundColor = AppTheme.card
+        layer.cornerRadius = 13
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(red: 35/255, green: 60/255, blue: 82/255, alpha: 1).cgColor
+
+        let iconBackground = UIView()
+        iconBackground.backgroundColor = AppTheme.cyan.withAlphaComponent(0.14)
+        iconBackground.layer.cornerRadius = 20
+        iconBackground.translatesAutoresizingMaskIntoConstraints = false
+        let icon = UIImageView(image: UIImage(systemName: feature.icon))
+        icon.tintColor = AppTheme.cyan
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconBackground.addSubview(icon)
+
+        let title = UILabel(); title.text = feature.title; title.textColor = AppTheme.primary
+        title.font = .systemFont(ofSize: 15, weight: .bold); title.numberOfLines = 0; title.textAlignment = .left
+        let summary = UILabel(); summary.text = feature.summary; summary.textColor = AppTheme.secondary
+        summary.font = .systemFont(ofSize: 12); summary.numberOfLines = 0; summary.textAlignment = .left
+        let words = UIStackView(arrangedSubviews: [title, summary]); words.axis = .vertical; words.spacing = 4
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right")); chevron.tintColor = AppTheme.secondary; chevron.contentMode = .scaleAspectFit
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        let row = UIStackView(arrangedSubviews: [iconBackground, words, chevron])
+        row.axis = .horizontal; row.alignment = .center; row.spacing = 12; row.isUserInteractionEnabled = false
+        row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
+        NSLayoutConstraint.activate([
+            iconBackground.widthAnchor.constraint(equalToConstant: 40), iconBackground.heightAnchor.constraint(equalToConstant: 40),
+            icon.centerXAnchor.constraint(equalTo: iconBackground.centerXAnchor), icon.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 22), icon.heightAnchor.constraint(equalToConstant: 22),
+            chevron.widthAnchor.constraint(equalToConstant: 9),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 13), row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 13),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -13), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -13)
+        ])
+        accessibilityLabel = "\(feature.title). \(feature.summary)"
+        accessibilityHint = "Opens the detailed feature guide"
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override var isHighlighted: Bool { didSet { alpha = isHighlighted ? 0.68 : 1 } }
+}
+
 final class ViewController: UIViewController {
     private let contentStack = UIStackView()
 
@@ -55,8 +98,10 @@ final class ViewController: UIViewController {
             contentStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -28)
         ])
         contentStack.addArrangedSubview(welcomeCard())
+        contentStack.addArrangedSubview(foregroundNoticeCard())
         contentStack.addArrangedSubview(settingsButton())
         contentStack.addArrangedSubview(setupCard())
+        contentStack.addArrangedSubview(supportButton())
         let heading = label("Complete Feature Guide", 21, .bold, AppTheme.primary); heading.accessibilityTraits = .header
         contentStack.addArrangedSubview(heading)
         contentStack.addArrangedSubview(label("Tap a feature for detailed instructions, limitations, and useful tips.", 13, .regular, AppTheme.secondary))
@@ -81,6 +126,42 @@ final class ViewController: UIViewController {
         button.addTarget(self, action: #selector(openSettingsGuide), for: .touchUpInside); return button
     }
 
+    private func foregroundNoticeCard() -> UIView {
+        let card = cardView()
+        card.layer.borderColor = UIColor(red: 245/255, green: 158/255, blue: 11/255, alpha: 0.65).cgColor
+        let icon = UIImageView(image: UIImage(systemName: "exclamationmark.triangle.fill"))
+        icon.tintColor = UIColor(red: 251/255, green: 191/255, blue: 36/255, alpha: 1)
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        let title = label("Safari must remain open on screen", 15, .bold, UIColor(red: 251/255, green: 191/255, blue: 36/255, alpha: 1))
+        let body = label("Auto-refresh and page monitoring can continue while you browse other tabs within Safari. They will not operate reliably after Safari is closed, moved into the background, or you switch to another app.", 13, .regular, AppTheme.primary)
+        body.numberOfLines = 0
+        let words = UIStackView(arrangedSubviews: [title, body]); words.axis = .vertical; words.spacing = 6
+        let row = UIStackView(arrangedSubviews: [icon, words]); row.axis = .horizontal; row.alignment = .top; row.spacing = 12; row.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(row)
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 25), icon.heightAnchor.constraint(equalToConstant: 25),
+            row.topAnchor.constraint(equalTo: card.topAnchor, constant: 15), row.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 15),
+            row.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -15), row.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -15)
+        ])
+        return card
+    }
+
+    private func supportButton() -> UIButton {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Contact Support"
+        config.image = UIImage(systemName: "envelope.fill")
+        config.imagePadding = 8
+        config.baseForegroundColor = AppTheme.cyan
+        config.baseBackgroundColor = AppTheme.cyan
+        config.cornerStyle = .medium
+        let button = UIButton(configuration: config)
+        button.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        button.addTarget(self, action: #selector(contactSupport), for: .touchUpInside)
+        button.accessibilityHint = "Creates an email to krabople@gmail.com"
+        return button
+    }
+
     private func setupCard() -> UIView {
         let card = cardView(); let stack = UIStackView(); stack.axis = .vertical; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = false
         stack.addArrangedSubview(label("Set up the extension", 17, .bold, AppTheme.cyan))
@@ -103,17 +184,13 @@ final class ViewController: UIViewController {
         NSLayoutConstraint.activate([badge.widthAnchor.constraint(equalToConstant: 24), badge.heightAnchor.constraint(equalToConstant: 24)]); return row
     }
 
-    private func featureButton(_ feature: FeatureGuide, _ index: Int) -> UIButton {
-        var config = UIButton.Configuration.plain(); config.title = feature.title; config.subtitle = feature.summary; config.image = UIImage(systemName: feature.icon)
-        config.imagePadding = 13; config.baseForegroundColor = AppTheme.primary; config.titleAlignment = .leading
-        config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14)
-        let button = UIButton(configuration: config); button.tag = index; button.contentHorizontalAlignment = .fill; button.backgroundColor = AppTheme.card
-        button.layer.cornerRadius = 13; button.layer.borderWidth = 1; button.layer.borderColor = UIColor(red: 35/255, green: 60/255, blue: 82/255, alpha: 1).cgColor
-        button.tintColor = AppTheme.cyan; button.addTarget(self, action: #selector(openFeature(_:)), for: .touchUpInside)
-        button.accessibilityHint = "Opens the detailed feature guide"; return button
+    private func featureButton(_ feature: FeatureGuide, _ index: Int) -> FeatureRowControl {
+        let control = FeatureRowControl(feature: feature); control.tag = index
+        control.addTarget(self, action: #selector(openFeature(_:)), for: .touchUpInside)
+        return control
     }
 
-    @objc private func openFeature(_ sender: UIButton) {
+    @objc private func openFeature(_ sender: UIControl) {
         guard Self.features.indices.contains(sender.tag) else { return }
         navigationController?.pushViewController(FeatureDetailViewController(feature: Self.features[sender.tag]), animated: true)
     }
@@ -126,6 +203,20 @@ final class ViewController: UIViewController {
         }); present(alert, animated: true)
     }
 
+    @objc private func contactSupport() {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "krabople@gmail.com"
+        components.queryItems = [URLQueryItem(name: "subject", value: "Auto Refresh XL Support")]
+        guard let url = components.url, UIApplication.shared.canOpenURL(url) else {
+            let alert = UIAlertController(title: "Email Support", message: "Please email krabople@gmail.com from your preferred email app.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
+
     private func cardView() -> UIView { let view = UIView(); view.backgroundColor = AppTheme.card; view.layer.cornerRadius = 14; view.layer.borderWidth = 1; view.layer.borderColor = UIColor(red: 31/255, green: 57/255, blue: 78/255, alpha: 1).cgColor; return view }
     private func label(_ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ color: UIColor) -> UILabel { let result = UILabel(); result.text = text; result.font = .systemFont(ofSize: size, weight: weight); result.textColor = color; return result }
 
@@ -133,10 +224,10 @@ final class ViewController: UIViewController {
         FeatureGuide(icon: "timer", title: "Intervals and countdowns", summary: "Preset or custom refresh timing", sections: [
             GuideSection(title: "How it works", body: "Choose a preset or enter hours, minutes, and seconds. Press Start Refresh to begin the first countdown. Monitoring does not check immediately; its first cycle occurs only when this countdown reaches zero."),
             GuideSection(title: "What happens at zero", body: "The extension obtains fresh content for monitoring, performs a genuine visible Safari reload, and schedules the next countdown. Page loading time and iOS suspension can delay very short intervals."),
-            GuideSection(title: "Tips", body: "Allow enough time for the site to load. Excessive refreshing may trigger captchas, rate limits, or a temporary website block.")]),
+            GuideSection(title: "Tips", body: "Allow enough time for the site to load. Refreshing very frequently can increase battery usage and mobile data use, and may trigger captchas, rate limits, or a temporary website block.")]),
         FeatureGuide(icon: "shuffle", title: "Random interval range", summary: "A new delay for every cycle", sections: [
             GuideSection(title: "Using random mode", body: "Enter minimum and maximum seconds. Preset and custom fields are disabled because a fresh random delay is selected after every cycle."),
-            GuideSection(title: "Limitations", body: "Random timing does not bypass website rules or anti-automation systems. Avoid extremely short ranges on complex pages.")]),
+            GuideSection(title: "Limitations", body: "Random timing can reduce repetitive request patterns and may avoid bot detection on some websites, but it does not always bypass website rules or anti-automation systems. Avoid extremely short ranges on complex pages.")]),
         FeatureGuide(icon: "arrow.clockwise", title: "Refresh options and limits", summary: "Hard refresh, limits, and interaction safety", sections: [
             GuideSection(title: "Hard Refresh", body: "Requests a reload that bypasses cached data where Safari supports it. Websites and service workers may still impose their own caching."),
             GuideSection(title: "Refresh Limit", body: "A positive number stops after that many cycles; zero is unlimited. The overlay shows the count."),
@@ -169,7 +260,6 @@ final class ViewController: UIViewController {
         FeatureGuide(icon: "checkmark.shield.fill", title: "Permissions and troubleshooting", summary: "Website access, profiles, and common fixes", sections: [
             GuideSection(title: "Enable in Settings", body: "Settings → Apps → Safari → Extensions → Safari Auto Refresh and Page Monitor XL. Turn on Allow Extension and grant the required website access."),
             GuideSection(title: "Enable in Safari", body: "Tap Page Menu beside the search field, then Manage Extensions. Switch on Auto Refresh XL and select it from Page Menu to open its controls."),
-            GuideSection(title: "If controls are missing", body: "Use a normal http or https page, grant website permission, reload once, and reopen the extension. Safari internal pages cannot be controlled."),
             GuideSection(title: "Saved entries", body: "Form values are saved per tab. Closing the extension with Safari’s blue checkmark should not discard an unfinished setup.")])
     ]
 }

@@ -41,6 +41,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const editRuleInterval = document.getElementById('editRuleInterval');
   const btnSaveRule = document.getElementById('btnSaveRule');
   const btnCancelRule = document.getElementById('btnCancelRule');
+  const deleteRuleDialog = document.getElementById('deleteRuleDialog');
+  const deleteRuleUrl = document.getElementById('deleteRuleUrl');
+  const btnConfirmRuleDelete = document.getElementById('btnConfirmRuleDelete');
+  const btnCancelRuleDelete = document.getElementById('btnCancelRuleDelete');
 
   let currentTabId = null;
   let activeState = null;
@@ -48,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let popupDraftCache = {};
   let targetWasEmpty = true;
   let editingRuleIndex = -1;
+  let deletingRuleIndex = -1;
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -230,6 +235,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
       } else if (!response.pageReady) {
         alert('The refresh timer started, but Safari has not injected the page controls yet. Reload this webpage once, then start again so the overlay and monitor can attach.');
+      } else {
+        setTimeout(() => window.close(), 80);
       }
     });
   }
@@ -373,14 +380,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       button.addEventListener('click', () => openRuleEditPanel(autoStartRules, Number(button.dataset.editRule)));
     });
     inlineRulesList.querySelectorAll('[data-delete-rule]').forEach(button => {
-      button.addEventListener('click', async () => {
-        const index = Number(button.dataset.deleteRule);
-        if (!confirm('Delete this Auto-Start rule?')) return;
-        autoStartRules.splice(index, 1);
-        await chrome.storage.local.set({ autoStartRules });
-        closeRuleEditPanel();
-        await renderInlineRules();
+      button.addEventListener('click', () => {
+        deletingRuleIndex = Number(button.dataset.deleteRule);
+        const rule = autoStartRules[deletingRuleIndex];
+        deleteRuleUrl.textContent = rule ? (rule.exactUrl || rule.pattern || '') : '';
+        deleteRuleDialog.classList.remove('hidden');
       });
+    });
+  }
+
+  function closeDeleteRuleDialog() {
+    deletingRuleIndex = -1;
+    deleteRuleDialog.classList.add('hidden');
+  }
+
+  if (btnCancelRuleDelete) btnCancelRuleDelete.addEventListener('click', closeDeleteRuleDialog);
+
+  if (btnConfirmRuleDelete) {
+    btnConfirmRuleDelete.addEventListener('click', async () => {
+      if (deletingRuleIndex < 0) return;
+      const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
+      if (deletingRuleIndex < autoStartRules.length) {
+        autoStartRules.splice(deletingRuleIndex, 1);
+        await chrome.storage.local.set({ autoStartRules });
+      }
+      closeDeleteRuleDialog();
+      closeRuleEditPanel();
+      await renderInlineRules();
     });
   }
 
