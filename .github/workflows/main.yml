@@ -122,20 +122,15 @@ jobs:
                      INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
                      archive -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive"
 
-          xcodebuild -exportArchive \
-                     -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive" \
-                     -exportPath "$GITHUB_WORKSPACE/export" \
-                     -exportOptionsPlist "$GITHUB_WORKSPACE/exportOptions.plist" \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyID "$KEY_ID" \
-                     -authenticationKeyIssuerID "$ISSUER_ID" \
-                     -authenticationKeyPath "$KEY_PATH"
-
-          EXPORTED_IPA=$(find "$GITHUB_WORKSPACE/export" -name "*.ipa" | head -n 1)
-          if [ -n "$EXPORTED_IPA" ]; then
-            cp "$EXPORTED_IPA" "$GITHUB_WORKSPACE/SafariAutoRefreshXL.ipa"
-            echo "Successfully packaged App Store signed IPA at SafariAutoRefreshXL.ipa"
+          APP_IN_ARCHIVE=$(find "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive" -name "*.app" -type d | grep -v "\.appex" | head -n 1)
+          if [ -n "$APP_IN_ARCHIVE" ]; then
+            echo "Found archived iOS application at: $APP_IN_ARCHIVE"
             cd "$GITHUB_WORKSPACE"
+            rm -rf ./Payload SafariAutoRefreshXL.ipa
+            mkdir -p ./Payload
+            cp -R "$APP_IN_ARCHIVE" ./Payload/
+            zip -r SafariAutoRefreshXL.ipa Payload
+            echo "Successfully packaged App Store signed IPA at SafariAutoRefreshXL.ipa"
             exit 0
           fi
         fi
