@@ -115,12 +115,31 @@ jobs:
                      -configuration Release \
                      -derivedDataPath "$GITHUB_WORKSPACE/build" \
                      DEVELOPMENT_TEAM="6YYA8L76Y8" \
+                     CODE_SIGN_STYLE="Automatic" \
+                     CODE_SIGN_IDENTITY="Apple Distribution" \
                      -allowProvisioningUpdates \
                      -authenticationKeyID "$KEY_ID" \
                      -authenticationKeyIssuerID "$ISSUER_ID" \
                      -authenticationKeyPath "$KEY_PATH" \
                      INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
                      archive -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive"
+
+          xcodebuild -exportArchive \
+                     -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive" \
+                     -exportPath "$GITHUB_WORKSPACE/export" \
+                     -exportOptionsPlist "$GITHUB_WORKSPACE/exportOptions.plist" \
+                     -allowProvisioningUpdates \
+                     -authenticationKeyID "$KEY_ID" \
+                     -authenticationKeyIssuerID "$ISSUER_ID" \
+                     -authenticationKeyPath "$KEY_PATH" || true
+
+          EXPORTED_IPA=$(find "$GITHUB_WORKSPACE/export" -name "*.ipa" | head -n 1)
+          if [ -n "$EXPORTED_IPA" ]; then
+            cp "$EXPORTED_IPA" "$GITHUB_WORKSPACE/SafariAutoRefreshXL.ipa"
+            echo "Successfully packaged App Store signed IPA at SafariAutoRefreshXL.ipa"
+            cd "$GITHUB_WORKSPACE"
+            exit 0
+          fi
 
           APP_IN_ARCHIVE=$(find "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive" -name "*.app" -type d | grep -v "\.appex" | head -n 1)
           if [ -n "$APP_IN_ARCHIVE" ]; then
@@ -130,7 +149,7 @@ jobs:
             mkdir -p ./Payload
             cp -R "$APP_IN_ARCHIVE" ./Payload/
             zip -r SafariAutoRefreshXL.ipa Payload
-            echo "Successfully packaged App Store signed IPA at SafariAutoRefreshXL.ipa"
+            echo "Packaged archived IPA at SafariAutoRefreshXL.ipa"
             exit 0
           fi
         fi
