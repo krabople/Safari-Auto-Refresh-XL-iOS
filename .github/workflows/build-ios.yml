@@ -105,21 +105,9 @@ jobs:
           KEY_PATH="$KEY_DIR/AuthKey_${KEY_ID}.p8"
           echo "$PRIVATE_KEY" > "$KEY_PATH"
 
-          cat << 'EOF' > "$GITHUB_WORKSPACE/exportOptions.plist"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>app-store</string>
-    <key>destination</key>
-    <string>export</string>
-    <key>manageAppVersionAndBuildNumber</key>
-    <true/>
-    <key>signingStyle</key>
-    <string>automatic</string>
-</dict>
-EOF
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > "$GITHUB_WORKSPACE/exportOptions.plist"
+          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> "$GITHUB_WORKSPACE/exportOptions.plist"
+          echo '<plist version="1.0"><dict><key>method</key><string>app-store</string><key>destination</key><string>export</string><key>manageAppVersionAndBuildNumber</key><true/><key>signingStyle</key><string>automatic</string></dict></plist>' >> "$GITHUB_WORKSPACE/exportOptions.plist"
 
           xcodebuild -project "$PROJ_NAME" \
                      -scheme "$SCHEME" \
