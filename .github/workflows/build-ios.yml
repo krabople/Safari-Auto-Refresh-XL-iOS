@@ -115,8 +115,6 @@ jobs:
                      -configuration Release \
                      -derivedDataPath "$GITHUB_WORKSPACE/build" \
                      DEVELOPMENT_TEAM="6YYA8L76Y8" \
-                     CODE_SIGN_STYLE="Automatic" \
-                     CODE_SIGN_IDENTITY="Apple Distribution" \
                      -allowProvisioningUpdates \
                      -authenticationKeyID "$KEY_ID" \
                      -authenticationKeyIssuerID "$ISSUER_ID" \
@@ -131,7 +129,7 @@ jobs:
                      -allowProvisioningUpdates \
                      -authenticationKeyID "$KEY_ID" \
                      -authenticationKeyIssuerID "$ISSUER_ID" \
-                     -authenticationKeyPath "$KEY_PATH" || true
+                     -authenticationKeyPath "$KEY_PATH"
 
           EXPORTED_IPA=$(find "$GITHUB_WORKSPACE/export" -name "*.ipa" | head -n 1)
           if [ -n "$EXPORTED_IPA" ]; then
