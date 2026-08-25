@@ -36,7 +36,7 @@ jobs:
         echo "=== 2. Converting Web Extension to iOS Xcode Project ==="
         rm -rf "$GITHUB_WORKSPACE/GeneratedProject"
         
-        xcrun safari-web-extension-converter "$FULL_RES_PATH" --bundle-identifier "com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8" --swift --ios-only --no-open --no-prompt --force --project-location "$GITHUB_WORKSPACE/GeneratedProject"
+        xcrun safari-web-extension-converter "$FULL_RES_PATH" --swift --ios-only --no-open --no-prompt --force --project-location "$GITHUB_WORKSPACE/GeneratedProject"
         
         echo "=== 2b. Injecting Custom Host App Components ==="
         VC_PATH=$(find "$GITHUB_WORKSPACE/GeneratedProject" -name "ViewController.swift" | head -n 1)
@@ -54,7 +54,11 @@ jobs:
           echo "Successfully injected native SafariWebExtensionHandler.swift at $HANDLER_PATH"
         fi
 
-        echo "=== 2c. Setting the installed display name ==="
+        echo "=== 2c. Updating Bundle Identifiers & Display Name for App Store Connect ==="
+        find "$GITHUB_WORKSPACE/GeneratedProject" -name "project.pbxproj" -type f | while read -r pbx; do
+          sed -i '' 's/com\.yourCompany\.Safari-Auto-Refresh-and-Page-Monitor-XL/com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8/g' "$pbx"
+        done
+
         find "$GITHUB_WORKSPACE/GeneratedProject" -name "Info.plist" -type f -print0 | while IFS= read -r -d '' PLIST_PATH; do
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Auto Refresh XL" "$PLIST_PATH" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$PLIST_PATH"
