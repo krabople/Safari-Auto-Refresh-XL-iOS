@@ -114,6 +114,7 @@ jobs:
                      -sdk iphoneos \
                      -configuration Release \
                      -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                     DEVELOPMENT_TEAM="6YYA8L76Y8" \
                      -allowProvisioningUpdates \
                      -authenticationKeyID "$KEY_ID" \
                      -authenticationKeyIssuerID "$ISSUER_ID" \
