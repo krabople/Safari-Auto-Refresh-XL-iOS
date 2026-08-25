@@ -2,6 +2,7 @@ const activeTabStates = {};
 const extensionLogs = [];
 let targetTabId = null;
 let tabStatesLoaded = false;
+const statesStartedDuringRestore = new Set();
 
 function addLog(category, message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -12,7 +13,7 @@ function addLog(category, message, type = 'info') {
 
 addLog('SYSTEM', 'Background service worker initialized');
 
-function scheduleNextRefresh(tabId) {
+async function scheduleNextRefresh(tabId, persist = true) {
   const state = activeTabStates[tabId];
   if (!state || !state.enabled) return;
 
@@ -24,12 +25,16 @@ function scheduleNextRefresh(tabId) {
   }
 
   state.nextRefreshTime = Date.now() + intervalSec * 1000;
-  saveTabStates();
+  if (persist) await saveTabStates();
 
   if (chrome.alarms) {
     // Alarms are a recovery mechanism when iOS suspends the service worker.
     // The one-second ticker below remains the precise timer while Safari is active.
-    chrome.alarms.create(`refresh_tab_${tabId}`, { when: state.nextRefreshTime });
+    try {
+      await chrome.alarms.create(`refresh_tab_${tabId}`, { when: state.nextRefreshTime });
+    } catch (error) {
+      addLog('TIMER', `Could not create recovery alarm for tab ${tabId}: ${error.message}`, 'warn');
+    }
   }
 }
 
@@ -101,7 +106,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 // makes the overlay and monitor disappear after reloads.
 const tabStatesReady = chrome.storage.local.get(['tabStates']).then((result) => {
   if (result.tabStates) {
-    Object.assign(activeTabStates, result.tabStates);
+    for (const [tabId, state] of Object.entries(result.tabStates)) {
+      if (!statesStartedDuringRestore.has(String(tabId))) {
+        activeTabStates[tabId] = state;
+      }
+    }
   }
   tabStatesLoaded = true;
 
@@ -162,29 +171,13 @@ async function runRefreshCycle(tabId, state) {
 
   state.refreshCount += 1;
 
-  let monitorMatched = false;
-  if (state.monitorEnabled && state.targetText) {
-    // Scan a fresh response before navigating. This lets an already-unlocked
-    // active tab present the alert before a reload destroys its document.
-    const result = await requestFromTab(tabId, {
-      type: 'FETCH_MONITOR_CHECK',
-      state: state,
-      checkCount: state.refreshCount
-    });
-
-    if (result && result.success) {
-      monitorMatched = result.matched === true;
-      addLog('MONITOR', `Fetched and checked tab ${tabId} (Check: ${state.refreshCount})`, 'success');
-    } else {
-      addLog('MONITOR', `Fetch check failed for tab ${tabId}: ${(result && result.error) || 'Page script unavailable'}`, 'error');
-    }
-  }
-
-  // Monitoring must not turn refresh into a hidden background fetch. Always
-  // reload the visible tab, including the final cycle that detects the target.
+  // Reload first, then let the content script inspect the document Safari
+  // actually rendered. A separately fetched copy can differ because of login
+  // state, bot protection, client rendering or caching, and an alert raised
+  // before this navigation would be destroyed by the reload itself.
   try {
     await chrome.tabs.reload(tabId, { bypassCache: !!state.hardRefresh });
-    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount}, matched: ${monitorMatched})`, 'success');
+    addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
   } catch (err) {
     addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
   }
@@ -199,7 +192,7 @@ async function runRefreshCycle(tabId, state) {
     updateActiveTabBadge();
   } else if (state.enabled) {
     state.isRefreshing = false;
-    scheduleNextRefresh(tabId);
+    await scheduleNextRefresh(tabId);
   } else {
     state.isRefreshing = false;
     saveTabStates();
@@ -260,7 +253,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           });
           activeTabStates[tabId] = newState;
           saveTabStates();
-          scheduleNextRefresh(tabId);
+          await scheduleNextRefresh(tabId);
           sendToTab(tabId, { type: 'STATE_SYNC', state: newState });
           updateActiveTabBadge();
           break;
@@ -303,8 +296,27 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
 });
 
+if (chrome.tabs.onReplaced) {
+  chrome.tabs.onReplaced.addListener(async (addedTabId, removedTabId) => {
+    const state = activeTabStates[removedTabId];
+    if (!state) return;
+    activeTabStates[addedTabId] = state;
+    delete activeTabStates[removedTabId];
+    targetTabId = targetTabId === removedTabId ? addedTabId : targetTabId;
+    if (chrome.alarms) {
+      await chrome.alarms.clear(`refresh_tab_${removedTabId}`);
+      if (state.enabled) {
+        await chrome.alarms.create(`refresh_tab_${addedTabId}`, {
+          when: Math.max(Date.now() + 100, state.nextRefreshTime || Date.now() + 1000)
+        });
+      }
+    }
+    await saveTabStates();
+  });
+}
+
 function saveTabStates() {
-  chrome.storage.local.set({ tabStates: activeTabStates });
+  return chrome.storage.local.set({ tabStates: activeTabStates });
 }
 
 async function sendToTab(tabId, message) {
@@ -342,47 +354,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   let resolvedTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
 
   if (request.type === 'START_REFRESH') {
-    const startExecution = async (tid) => {
+    const startExecution = async (tid, tab) => {
       if (!tid) {
         addLog('REFRESH', '🔴 Start Refresh Failed: No target tab ID', 'error');
         sendResponse({ success: false });
         return;
       }
+      statesStartedDuringRestore.add(String(tid));
       activeTabStates[tid] = Object.assign({}, DEFAULT_TAB_STATE, request.state, {
         enabled: true,
         nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
-        refreshCount: request.state.refreshCount || 0
+        refreshCount: request.state.refreshCount || 0,
+        startedAt: Date.now(),
+        sourceUrl: (tab && tab.url) || request.state.sourceUrl || ''
       });
 
-      saveTabStates();
+      // Do not hold a cold-start click behind Safari's storage restoration.
+      // Persist after restoration so this new state is merged with, rather than
+      // accidentally replacing, any other sessions Safari is still loading.
+      const persistStartedState = () => saveTabStates().catch(error => {
+        addLog('SYSTEM', `Could not persist the new refresh state: ${error.message}`, 'error');
+      });
+      if (tabStatesLoaded) {
+        persistStartedState();
+      } else {
+        tabStatesReady.then(persistStartedState).catch(error => {
+          addLog('SYSTEM', `Could not finish startup state restoration: ${error.message}`, 'error');
+          persistStartedState();
+        });
+      }
       updateActiveTabBadge();
       targetTabId = tid;
 
       addLog('REFRESH', `Started refresh for tab ${tid} (${activeTabStates[tid].interval || activeTabStates[tid].minInterval}s)`);
 
-      scheduleNextRefresh(tid);
-      const pageReady = await sendToTab(tid, { type: 'REFRESH_STARTED', state: activeTabStates[tid] });
-      sendResponse({ success: true, pageReady, state: activeTabStates[tid] });
+      // The refresh state is complete at this point. Safari may still be
+      // attaching the content script or starting its alarms subsystem during
+      // the first few seconds after launch, so neither operation may delay the
+      // popup acknowledgement.
+      scheduleNextRefresh(tid, false).catch(error => {
+        addLog('TIMER', `Could not finish initial timer setup: ${error.message}`, 'warn');
+      });
+      sendToTab(tid, { type: 'REFRESH_STARTED', state: activeTabStates[tid] });
+      sendResponse({ success: true, state: activeTabStates[tid] });
     };
 
     const beginStart = () => {
+      // The popup's captured ID is the fastest reliable target. If Safari
+      // replaces that startup tab moments later, onReplaced migrates the state.
       if (resolvedTabId) {
-        startExecution(resolvedTabId);
-      } else {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const foundId = (tabs && tabs[0]) ? tabs[0].id : null;
-        startExecution(foundId);
-        });
+        startExecution(resolvedTabId, null);
+        return;
       }
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime.lastError) {
+          addLog('REFRESH', `Could not resolve the active startup tab: ${chrome.runtime.lastError.message}`, 'error');
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        const activeTab = tabs && tabs[0];
+        startExecution(activeTab && activeTab.id, activeTab || null);
+      });
     };
 
-    if (tabStatesLoaded) {
-      beginStart();
-    } else {
-      tabStatesReady.then(beginStart).catch(() => {
-        sendResponse({ success: false });
-      });
-    }
+    beginStart();
     return true;
   }
 

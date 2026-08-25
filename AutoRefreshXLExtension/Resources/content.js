@@ -1,6 +1,7 @@
 // Auto Refresh XL - iOS Safari Content Script
 
 (function () {
+  const isTopFrame = window.top === window;
   let currentTabState = null;
   let overlayElement = null;
   let overlayShadow = null;
@@ -65,6 +66,11 @@
 
     if (currentTabState.enabled) {
       initContentFeatures();
+    } else if (currentTabState.monitorEnabled && currentTabState.targetText &&
+               Number(currentTabState.refreshCount || 0) > 0) {
+      // The maximum-refresh limit may stop the timer as the final navigation
+      // begins. The final refreshed page must still receive its promised check.
+      startMonitoringLoop();
     }
   });
 
@@ -111,15 +117,6 @@
     } else if (request.type === 'APPLY_DETECTED_PAGE_ACTIONS') {
       applyDetectedPageActions(request).then(sendResponse);
       return true;
-    } else if (request.type === 'FETCH_MONITOR_CHECK') {
-      currentTabState = request.state || currentTabState;
-      fetchAndCheckCurrentPage()
-        .then((matched) => sendResponse({ success: true, matched }))
-        .catch((error) => {
-          logDebug('FETCH', 'Fetch check failed: ' + error.message, 'error');
-          sendResponse({ success: false, error: error.message });
-        });
-      return true;
     }
   });
 
@@ -133,7 +130,7 @@
 
     // iOS requires a control inside the webpage to unlock audio. Show the
     // compact widget for that control even when the optional timer overlay is off.
-    if ((currentTabState.overlayEnabled !== false || needsSoundControl) && !overlayElement) {
+    if (isTopFrame && (currentTabState.overlayEnabled !== false || needsSoundControl) && !overlayElement) {
       renderFloatingOverlay();
     }
 
@@ -143,6 +140,40 @@
 
     if (currentTabState.stopOnInteraction) {
       setupUserInteractionListener();
+    }
+
+    // Monitoring deliberately begins only after the first completed refresh.
+    // Scan the rendered DOM immediately, then continue watching sites which
+    // insert or replace their content after the load event.
+    if (currentTabState.monitorEnabled && currentTabState.targetText &&
+        Number(currentTabState.refreshCount || 0) > 0 && !hasTriggeredTarget) {
+      startMonitoringLoop();
+    } else if (!currentTabState.monitorEnabled || !currentTabState.targetText) {
+      stopMonitoringLoop();
+    }
+  }
+
+  function startMonitoringLoop() {
+    if (hasTriggeredTarget) return;
+
+    queueMonitoringCheck();
+
+    if (!monitorObserver) {
+      const root = document.body || document.documentElement;
+      if (root) {
+        monitorObserver = new MutationObserver(queueMonitoringCheck);
+        monitorObserver.observe(root, {
+          subtree: true,
+          childList: true,
+          characterData: true
+        });
+      }
+    }
+
+    // MutationObserver covers most modern sites. Polling also catches framework
+    // updates which Safari occasionally coalesces in a non-foreground tab.
+    if (!monitorIntervalId) {
+      monitorIntervalId = setInterval(queueMonitoringCheck, 1500);
     }
   }
 
@@ -171,27 +202,7 @@
     }, 100);
   }
 
-  async function fetchAndCheckCurrentPage() {
-    if (!currentTabState || hasTriggeredTarget) return false;
-
-    logDebug('FETCH', 'Fetching a fresh copy of ' + window.location.href);
-    const response = await fetch(window.location.href, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'include',
-      redirect: 'follow'
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
-    }
-
-    const html = await response.text();
-    const fetchedDocument = new DOMParser().parseFromString(html, 'text/html');
-    return checkPageMonitoring(fetchedDocument, true);
-  }
-
-  function checkPageMonitoring(sourceDocument = document, isFetchedCopy = false) {
+  function checkPageMonitoring(sourceDocument = document) {
     if (!currentTabState) {
       return false;
     }
@@ -228,7 +239,7 @@
       }
     } else {
       const bodyText = getPageText(sourceDocument);
-      isFound = bodyText.toLowerCase().includes(target.toLowerCase());
+      isFound = normalizePlainText(bodyText).includes(normalizePlainText(target));
       if (isFound) {
         matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'), sourceDocument);
       }
@@ -250,7 +261,7 @@
     // 1. Highlight exact matching text in webpage DOM
     let highlightedEl = null;
     try {
-      if (!isFetchedCopy && currentTabState.actionHighlight !== false) {
+      if (currentTabState.actionHighlight !== false) {
         logDebug('HIGHLIGHT', 'Executing highlightMatchingText...');
         highlightedEl = highlightMatchingText(currentTabState.targetText, currentTabState.matchType);
         if (highlightedEl) {
@@ -266,7 +277,7 @@
     // Presentation is routed by the background worker to whichever Safari tab
     // the user is currently viewing. This source tab only performs page actions.
     try {
-      const targetToScroll = isFetchedCopy ? null : (highlightedEl || matchedNode);
+      const targetToScroll = highlightedEl || matchedNode;
       if (targetToScroll && currentTabState.actionScroll !== false) {
         logDebug('SCROLL', 'Scrolling to target element...');
         targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -424,7 +435,35 @@
   function getPageText(sourceDocument = document) {
     const root = sourceDocument.body || sourceDocument.documentElement;
     if (!root) return '';
-    return `${root.innerText || ''} ${root.textContent || ''}`;
+    return getSearchRoots(sourceDocument).map(searchRoot => {
+      // innerText reflects what the page renders and avoids false matches from
+      // scripts/styles. ShadowRoot has no innerText, so use its textContent.
+      const rendered = searchRoot.innerText;
+      if (typeof rendered === 'string' && rendered.trim()) return rendered;
+      return searchRoot.textContent || '';
+    }).join(' ');
+  }
+
+  function normalizePlainText(value) {
+    const text = String(value || '');
+    const compatible = typeof text.normalize === 'function' ? text.normalize('NFKC') : text;
+    return compatible.replace(/[\u00a0\s]+/g, ' ').trim().toLocaleLowerCase();
+  }
+
+  function getSearchRoots(sourceDocument = document) {
+    const initialRoot = sourceDocument.body || sourceDocument.documentElement;
+    if (!initialRoot) return [];
+    const roots = [initialRoot];
+    for (let index = 0; index < roots.length; index += 1) {
+      const searchRoot = roots[index];
+      if (!searchRoot.querySelectorAll) continue;
+      searchRoot.querySelectorAll('*').forEach(element => {
+        if (element.shadowRoot && !roots.includes(element.shadowRoot)) {
+          roots.push(element.shadowRoot);
+        }
+      });
+    }
+    return roots;
   }
 
   function escapeHTML(str) {
@@ -453,35 +492,37 @@
 
     injectHighlightStyles();
 
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: function (node) {
-          regex.lastIndex = 0;
-          if (!node.nodeValue || !regex.test(node.nodeValue)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          if (parent.closest('#arp-target-alert-banner') || parent.closest('#arp-floating-overlay-host') || parent.closest('.arp-exact-word-highlight')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          const tag = parent.tagName.toLowerCase();
-          if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || tag === 'mark') {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      },
-      false
-    );
-
     const matchingTextNodes = [];
-    let textNode;
-    while ((textNode = walker.nextNode())) {
-      matchingTextNodes.push(textNode);
-    }
+    getSearchRoots(document).forEach(searchRoot => {
+      const walker = document.createTreeWalker(
+        searchRoot,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: function (node) {
+            regex.lastIndex = 0;
+            if (!node.nodeValue || !regex.test(node.nodeValue)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+            if (parent.closest('#arp-target-alert-banner') || parent.closest('#arp-floating-overlay-host') || parent.closest('.arp-exact-word-highlight')) {
+              return NodeFilter.FILTER_REJECT;
+            }
+            const tag = parent.tagName.toLowerCase();
+            if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || tag === 'mark') {
+              return NodeFilter.FILTER_REJECT;
+            }
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        },
+        false
+      );
+
+      let textNode;
+      while ((textNode = walker.nextNode())) {
+        matchingTextNodes.push(textNode);
+      }
+    });
 
     let firstHighlightedEl = null;
 
@@ -544,14 +585,14 @@
   }
 
   function findTextNodeMatching(regex, sourceDocument = document) {
-    const root = sourceDocument.body || sourceDocument.documentElement;
-    if (!root) return null;
-    const walker = sourceDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    while ((node = walker.nextNode())) {
-      regex.lastIndex = 0;
-      if (regex.test(node.nodeValue) && node.parentElement) {
-        return node.parentElement;
+    for (const searchRoot of getSearchRoots(sourceDocument)) {
+      const walker = sourceDocument.createTreeWalker(searchRoot, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        regex.lastIndex = 0;
+        if (regex.test(node.nodeValue) && node.parentElement) {
+          return node.parentElement;
+        }
       }
     }
     return null;

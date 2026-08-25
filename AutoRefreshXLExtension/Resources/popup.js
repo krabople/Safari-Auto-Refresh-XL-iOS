@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let targetWasEmpty = true;
   let editingRuleIndex = -1;
   let deletingRuleIndex = -1;
+  let startRequestInFlight = false;
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     : { type: 'GET_TAB_STATE' };
   chrome.runtime.sendMessage(stateRequest, async (response) => {
     if (!response || !response.state) return;
+    if (startRequestInFlight) return;
     activeState = response.state;
     const { popupDrafts = {} } = await chrome.storage.local.get(['popupDrafts']);
     popupDraftCache = popupDrafts;
@@ -228,9 +230,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function startRefresh(statePayload) {
+    startRequestInFlight = true;
+    startStopBtn.disabled = true;
     updateActiveStatus(true);
     chrome.runtime.sendMessage({ type: 'START_REFRESH', tabId: currentTabId, state: statePayload }, (response) => {
       if (chrome.runtime.lastError || !response || !response.success) {
+        startRequestInFlight = false;
+        startStopBtn.disabled = false;
         updateActiveStatus(false);
         alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
       } else {
