@@ -93,7 +93,65 @@ jobs:
         
         echo "Selected Scheme: '$SCHEME'"
 
-        echo "=== 5. Compiling Real ARM64 iOS Application (iphoneos SDK with Ad-Hoc Signing) ==="
+        echo "=== 5. Compiling iOS Application ==="
+        KEY_ID="${{ secrets.APPSTORE_KEY_ID }}"
+        ISSUER_ID="${{ secrets.APPSTORE_ISSUER_ID }}"
+        PRIVATE_KEY="${{ secrets.APPSTORE_PRIVATE_KEY }}"
+
+        if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY" ]; then
+          echo "App Store Connect API key detected. Building & signing for App Store / TestFlight..."
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${KEY_ID}.p8"
+          echo "$PRIVATE_KEY" > "$KEY_PATH"
+
+          cat << 'EOF' > "$GITHUB_WORKSPACE/exportOptions.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>destination</key>
+    <string>export</string>
+    <key>manageAppVersionAndBuildNumber</key>
+    <true/>
+    <key>signingStyle</key>
+    <string>automatic</string>
+</dict>
+EOF
+
+          xcodebuild -project "$PROJ_NAME" \
+                     -scheme "$SCHEME" \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                     -allowProvisioningUpdates \
+                     -authenticationKeyID "$KEY_ID" \
+                     -authenticationKeyIssuerID "$ISSUER_ID" \
+                     -authenticationKeyPath "$KEY_PATH" \
+                     INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
+                     archive -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive"
+
+          xcodebuild -exportArchive \
+                     -archivePath "$GITHUB_WORKSPACE/build/AutoRefreshXL.xcarchive" \
+                     -exportPath "$GITHUB_WORKSPACE/export" \
+                     -exportOptionsPlist "$GITHUB_WORKSPACE/exportOptions.plist" \
+                     -allowProvisioningUpdates \
+                     -authenticationKeyID "$KEY_ID" \
+                     -authenticationKeyIssuerID "$ISSUER_ID" \
+                     -authenticationKeyPath "$KEY_PATH"
+
+          EXPORTED_IPA=$(find "$GITHUB_WORKSPACE/export" -name "*.ipa" | head -n 1)
+          if [ -n "$EXPORTED_IPA" ]; then
+            cp "$EXPORTED_IPA" "$GITHUB_WORKSPACE/SafariAutoRefreshXL.ipa"
+            echo "Successfully packaged App Store signed IPA at SafariAutoRefreshXL.ipa"
+            cd "$GITHUB_WORKSPACE"
+            exit 0
+          fi
+        fi
+
+        echo "Fallback: Building with Ad-Hoc signing for Sideloadly..."
         xcodebuild -project "$PROJ_NAME" \
                    -scheme "$SCHEME" \
                    -sdk iphoneos \
