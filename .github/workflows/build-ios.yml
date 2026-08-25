@@ -126,7 +126,6 @@ jobs:
         path: SafariAutoRefreshXL.ipa
 
     - name: Upload to TestFlight (App Store Connect)
-      if: ${{ secrets.APPSTORE_KEY_ID != '' && secrets.APPSTORE_ISSUER_ID != '' && secrets.APPSTORE_PRIVATE_KEY != '' }}
       uses: apple-actions/upload-testflight-build@v1
       with:
         app-path: 'SafariAutoRefreshXL.ipa'
