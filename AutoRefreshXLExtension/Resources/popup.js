@@ -1,6 +1,7 @@
 // Auto Refresh XL - iOS Safari Popup Script
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const t = (window.ARXL_I18N && window.ARXL_I18N.t) || (value => value);
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
   const countdownDisplay = document.getElementById('countdownDisplay');
@@ -173,18 +174,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (enabled) {
       statusDot.classList.add('active');
       statusText.classList.add('active');
-      statusText.textContent = 'ACTIVE';
+      statusText.textContent = t('ACTIVE');
       startStopBtn.classList.remove('btn-primary');
       startStopBtn.classList.add('btn-danger');
-      startStopText.textContent = 'STOP REFRESH';
+      startStopText.textContent = t('STOP REFRESH');
     } else {
       statusDot.classList.remove('active');
       statusText.classList.remove('active');
-      statusText.textContent = 'INACTIVE';
+      statusText.textContent = t('INACTIVE');
       countdownDisplay.textContent = '00:00';
       startStopBtn.classList.remove('btn-danger');
       startStopBtn.classList.add('btn-primary');
-      startStopText.textContent = 'START REFRESH';
+      startStopText.textContent = t('START REFRESH');
     }
   }
 
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         startRequestInFlight = false;
         startStopBtn.disabled = false;
         updateActiveStatus(false);
-        alert('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.');
+        alert(t('Auto refresh could not start for this page. Check that Safari allows this extension on the website, then reload the page and try again.'));
       } else {
         setTimeout(() => window.close(), 80);
       }
@@ -309,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const currentTab = tabs && tabs[0];
       if (!currentTab || !currentTab.url || !/^https?:/i.test(currentTab.url)) {
-        if (autoStartResult) autoStartResult.textContent = 'This Safari page cannot be added to Auto-Start.';
+        if (autoStartResult) autoStartResult.textContent = t('This Safari page cannot be added to Auto-Start.');
         return;
       }
 
@@ -321,7 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
 
       if (exists) {
-        if (autoStartResult) autoStartResult.textContent = '✓ This exact page is already in Auto-Start.';
+        if (autoStartResult) autoStartResult.textContent = `✓ ${t('This exact page is already in Auto-Start.')}`;
         return;
       }
 
@@ -334,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       await chrome.storage.local.set({ autoStartRules });
       if (autoStartResult) {
-        autoStartResult.textContent = '✓ Exact page added to Auto-Start.';
+        autoStartResult.textContent = `✓ ${t('Exact page added to Auto-Start.')}`;
         autoStartResult.style.color = '#4ade80';
       }
     });
@@ -366,7 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!inlineRulesList) return;
     const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
     if (!autoStartRules.length) {
-      inlineRulesList.innerHTML = '<div class="support-note">No Auto-Start rules have been added yet.</div>';
+      inlineRulesList.innerHTML = `<div class="support-note">${t('No Auto-Start rules have been added yet.')}</div>`;
       return;
     }
     inlineRulesList.innerHTML = autoStartRules.map((rule, index) => `
@@ -438,7 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const url = editRuleUrl.value.trim();
       const interval = Math.max(1, Number.parseInt(editRuleInterval.value, 10) || 10);
       if (!/^https?:\/\//i.test(url)) {
-        alert('Enter a complete webpage URL beginning with http:// or https://.');
+        alert(t('Enter a complete webpage URL beginning with http:// or https://.'));
         return;
       }
       const { autoStartRules = [] } = await chrome.storage.local.get(['autoStartRules']);
@@ -473,10 +474,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           oscillator.start(now + index * 0.16);
           oscillator.stop(now + index * 0.16 + 0.23);
         });
-        btnTestSound.textContent = '✓ Sound Played';
-        setTimeout(() => { btnTestSound.textContent = '🔊 Test Notification Sound'; }, 1200);
+        btnTestSound.textContent = `✓ ${t('Sound Played')}`;
+        setTimeout(() => { btnTestSound.textContent = t('🔊 Test Notification Sound'); }, 1200);
       } catch (error) {
-        btnTestSound.textContent = 'Sound Unavailable';
+        btnTestSound.textContent = t('Sound Unavailable');
       }
     });
   }

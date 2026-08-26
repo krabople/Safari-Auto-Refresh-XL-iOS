@@ -1,5 +1,47 @@
 import UIKit
 
+private let appTranslations: [String: [String: String]] = [
+    "de": [
+        "Complete Feature Guide":"Vollständige Funktionsübersicht", "Tap a feature for detailed instructions, limitations, and useful tips.":"Tippe auf eine Funktion, um Anleitungen, Einschränkungen und Tipps anzuzeigen.", "Auto Refresh XL Settings":"Auto Refresh XL Einstellungen", "Contact Support":"Support kontaktieren", "Set up the extension":"Erweiterung einrichten", "Allow the extension":"Erweiterung erlauben", "Allow website access":"Website-Zugriff erlauben", "Open it in Safari":"In Safari öffnen", "If it is missing":"Falls sie nicht angezeigt wird", "Intervals and countdowns":"Intervalle und Countdowns", "Preset or custom refresh timing":"Vorgegebene oder eigene Aktualisierungszeiten", "Random interval range":"Zufälliger Intervallbereich", "A new delay for every cycle":"Neue Verzögerung bei jedem Durchlauf", "Refresh options and limits":"Aktualisierungsoptionen und Limits", "Hard refresh, limits, and interaction safety":"Vollständige Aktualisierung, Limits und Interaktionsschutz", "On-page overlay":"Widget auf der Webseite", "Countdown, monitored term, and controls":"Countdown, überwachter Begriff und Steuerung", "Content monitoring":"Inhaltsüberwachung", "Text, regex, and XPath matching":"Text-, Regex- und XPath-Vergleich", "Sound alerts":"Akustische Alarme", "Safari-safe audible target alerts":"Zuverlässige akustische Safari-Alarme", "On-screen target alerts":"Sichtbare Zielalarme", "Visible alerts across Safari tabs":"Sichtbare Alarme in Safari-Tabs", "Highlight and auto-scroll":"Hervorheben und automatisch scrollen", "Find a detected result after reload":"Erkanntes Ergebnis nach dem Neuladen finden", "Auto-Start rules":"Auto-Start-Regeln", "Start on saved exact pages":"Auf gespeicherten genauen Seiten starten", "Permissions and troubleshooting":"Berechtigungen und Fehlerbehebung", "Website access, profiles, and common fixes":"Website-Zugriff, Profile und häufige Lösungen", "Email Support":"E-Mail-Support", "Please email krabople@gmail.com from your preferred email app.":"Bitte sende über deine bevorzugte E-Mail-App eine Nachricht an krabople@gmail.com.", "OK":"OK"
+    ],
+    "fr": [
+        "Complete Feature Guide":"Guide complet des fonctionnalités", "Tap a feature for detailed instructions, limitations, and useful tips.":"Touchez une fonctionnalité pour afficher les instructions, limites et conseils.", "Auto Refresh XL Settings":"Réglages d’Auto Refresh XL", "Contact Support":"Contacter l’assistance", "Set up the extension":"Configurer l’extension", "Allow the extension":"Autoriser l’extension", "Allow website access":"Autoriser l’accès aux sites web", "Open it in Safari":"Ouvrir dans Safari", "If it is missing":"Si elle n’apparaît pas", "Intervals and countdowns":"Intervalles et comptes à rebours", "Preset or custom refresh timing":"Fréquence prédéfinie ou personnalisée", "Random interval range":"Plage d’intervalle aléatoire", "A new delay for every cycle":"Un nouveau délai à chaque cycle", "Refresh options and limits":"Options et limites d’actualisation", "Hard refresh, limits, and interaction safety":"Actualisation forcée, limites et sécurité", "On-page overlay":"Widget superposé", "Countdown, monitored term, and controls":"Compte à rebours, terme surveillé et commandes", "Content monitoring":"Surveillance du contenu", "Text, regex, and XPath matching":"Correspondance texte, expression et XPath", "Sound alerts":"Alertes sonores", "Safari-safe audible target alerts":"Alertes sonores fiables dans Safari", "On-screen target alerts":"Alertes visibles", "Visible alerts across Safari tabs":"Alertes visibles dans les onglets Safari", "Highlight and auto-scroll":"Surlignage et défilement automatique", "Find a detected result after reload":"Retrouver un résultat après l’actualisation", "Auto-Start rules":"Règles de démarrage auto", "Start on saved exact pages":"Démarrer sur des pages exactes enregistrées", "Permissions and troubleshooting":"Autorisations et dépannage", "Website access, profiles, and common fixes":"Accès aux sites, profils et solutions courantes", "Email Support":"Assistance par e-mail", "Please email krabople@gmail.com from your preferred email app.":"Envoyez un e-mail à krabople@gmail.com depuis votre application préférée.", "OK":"OK"
+    ],
+    "es": [
+        "Complete Feature Guide":"Guía completa de funciones", "Tap a feature for detailed instructions, limitations, and useful tips.":"Toca una función para ver instrucciones, limitaciones y consejos.", "Auto Refresh XL Settings":"Ajustes de Auto Refresh XL", "Contact Support":"Contactar con soporte", "Set up the extension":"Configurar la extensión", "Allow the extension":"Permitir la extensión", "Allow website access":"Permitir acceso a sitios web", "Open it in Safari":"Abrir en Safari", "If it is missing":"Si no aparece", "Intervals and countdowns":"Intervalos y cuentas atrás", "Preset or custom refresh timing":"Frecuencia predefinida o personalizada", "Random interval range":"Intervalo aleatorio", "A new delay for every cycle":"Un nuevo retraso en cada ciclo", "Refresh options and limits":"Opciones y límites de recarga", "Hard refresh, limits, and interaction safety":"Recarga completa, límites y seguridad", "On-page overlay":"Widget superpuesto", "Countdown, monitored term, and controls":"Cuenta atrás, término vigilado y controles", "Content monitoring":"Monitorización de contenido", "Text, regex, and XPath matching":"Coincidencia de texto, regex y XPath", "Sound alerts":"Alertas sonoras", "Safari-safe audible target alerts":"Alertas sonoras fiables en Safari", "On-screen target alerts":"Alertas visibles", "Visible alerts across Safari tabs":"Alertas visibles entre pestañas de Safari", "Highlight and auto-scroll":"Resaltado y desplazamiento automático", "Find a detected result after reload":"Encuentra el resultado después de recargar", "Auto-Start rules":"Reglas de inicio automático", "Start on saved exact pages":"Iniciar en páginas exactas guardadas", "Permissions and troubleshooting":"Permisos y solución de problemas", "Website access, profiles, and common fixes":"Acceso web, perfiles y soluciones habituales", "Email Support":"Soporte por correo", "Please email krabople@gmail.com from your preferred email app.":"Envía un correo a krabople@gmail.com desde tu aplicación preferida.", "OK":"Aceptar"
+    ],
+    "it": [
+        "Complete Feature Guide":"Guida completa alle funzioni", "Tap a feature for detailed instructions, limitations, and useful tips.":"Tocca una funzione per istruzioni, limitazioni e suggerimenti.", "Auto Refresh XL Settings":"Impostazioni Auto Refresh XL", "Contact Support":"Contatta l’assistenza", "Set up the extension":"Configura l’estensione", "Allow the extension":"Consenti l’estensione", "Allow website access":"Consenti l’accesso ai siti web", "Open it in Safari":"Apri in Safari", "If it is missing":"Se non è visibile", "Intervals and countdowns":"Intervalli e conto alla rovescia", "Preset or custom refresh timing":"Tempi predefiniti o personalizzati", "Random interval range":"Intervallo casuale", "A new delay for every cycle":"Un nuovo ritardo per ogni ciclo", "Refresh options and limits":"Opzioni e limiti di aggiornamento", "On-page overlay":"Widget sulla pagina", "Content monitoring":"Monitoraggio dei contenuti", "Sound alerts":"Avvisi sonori", "On-screen target alerts":"Avvisi sullo schermo", "Highlight and auto-scroll":"Evidenziazione e scorrimento automatico", "Auto-Start rules":"Regole di avvio automatico", "Permissions and troubleshooting":"Autorizzazioni e risoluzione dei problemi", "Email Support":"Assistenza e-mail", "Please email krabople@gmail.com from your preferred email app.":"Invia un’e-mail a krabople@gmail.com dalla tua app preferita.", "OK":"OK"
+    ],
+    "pt": [
+        "Complete Feature Guide":"Guia completo de funcionalidades", "Tap a feature for detailed instructions, limitations, and useful tips.":"Toque numa funcionalidade para ver instruções, limitações e sugestões.", "Auto Refresh XL Settings":"Definições do Auto Refresh XL", "Contact Support":"Contactar o suporte", "Set up the extension":"Configurar a extensão", "Allow the extension":"Permitir a extensão", "Allow website access":"Permitir acesso a sites", "Open it in Safari":"Abrir no Safari", "If it is missing":"Se não aparecer", "Intervals and countdowns":"Intervalos e contagens decrescentes", "Random interval range":"Intervalo aleatório", "Refresh options and limits":"Opções e limites de atualização", "On-page overlay":"Widget sobre a página", "Content monitoring":"Monitorização de conteúdo", "Sound alerts":"Alertas sonoros", "On-screen target alerts":"Alertas no ecrã", "Highlight and auto-scroll":"Realce e deslocação automática", "Auto-Start rules":"Regras de início automático", "Permissions and troubleshooting":"Permissões e resolução de problemas", "Email Support":"Suporte por e-mail", "Please email krabople@gmail.com from your preferred email app.":"Envie um e-mail para krabople@gmail.com através da sua aplicação preferida.", "OK":"OK"
+    ],
+    "nl": [
+        "Complete Feature Guide":"Volledige functiegids", "Tap a feature for detailed instructions, limitations, and useful tips.":"Tik op een functie voor instructies, beperkingen en tips.", "Auto Refresh XL Settings":"Instellingen van Auto Refresh XL", "Contact Support":"Contact opnemen", "Set up the extension":"De extensie instellen", "Allow the extension":"De extensie toestaan", "Allow website access":"Websitetoegang toestaan", "Open it in Safari":"Openen in Safari", "If it is missing":"Als de extensie ontbreekt", "Intervals and countdowns":"Intervallen en aftellen", "Random interval range":"Willekeurig interval", "Refresh options and limits":"Verversingsopties en limieten", "On-page overlay":"Widget op de pagina", "Content monitoring":"Inhoud controleren", "Sound alerts":"Geluidsmeldingen", "On-screen target alerts":"Meldingen op het scherm", "Highlight and auto-scroll":"Markeren en automatisch scrollen", "Auto-Start rules":"Regels voor automatisch starten", "Permissions and troubleshooting":"Toestemming en probleemoplossing", "Email Support":"E-mailondersteuning", "Please email krabople@gmail.com from your preferred email app.":"Stuur vanuit je favoriete e-mailapp een bericht naar krabople@gmail.com.", "OK":"OK"
+    ],
+    "ja": [
+        "Complete Feature Guide":"機能ガイド", "Tap a feature for detailed instructions, limitations, and useful tips.":"機能をタップすると、詳しい手順、制限事項、ヒントが表示されます。", "Auto Refresh XL Settings":"Auto Refresh XLの設定", "Contact Support":"サポートに連絡", "Set up the extension":"拡張機能を設定", "Allow the extension":"拡張機能を許可", "Allow website access":"Webサイトへのアクセスを許可", "Open it in Safari":"Safariで開く", "If it is missing":"表示されない場合", "Intervals and countdowns":"間隔とカウントダウン", "Preset or custom refresh timing":"プリセットまたはカスタムの更新時間", "Random interval range":"ランダム間隔", "A new delay for every cycle":"サイクルごとに新しい待ち時間", "Refresh options and limits":"更新オプションと上限", "On-page overlay":"ページ上のウィジェット", "Content monitoring":"コンテンツ監視", "Sound alerts":"サウンド通知", "On-screen target alerts":"画面上の通知", "Highlight and auto-scroll":"強調表示と自動スクロール", "Auto-Start rules":"自動開始ルール", "Permissions and troubleshooting":"権限とトラブルシューティング", "Email Support":"メールサポート", "Please email krabople@gmail.com from your preferred email app.":"お使いのメールアプリからkrabople@gmail.comにご連絡ください。", "OK":"OK"
+    ],
+    "ko": [
+        "Complete Feature Guide":"전체 기능 안내", "Tap a feature for detailed instructions, limitations, and useful tips.":"기능을 탭하면 자세한 안내, 제한 사항 및 팁을 볼 수 있습니다.", "Auto Refresh XL Settings":"Auto Refresh XL 설정", "Contact Support":"지원 문의", "Set up the extension":"확장 프로그램 설정", "Allow the extension":"확장 프로그램 허용", "Allow website access":"웹사이트 접근 허용", "Open it in Safari":"Safari에서 열기", "If it is missing":"표시되지 않는 경우", "Intervals and countdowns":"간격 및 카운트다운", "Random interval range":"무작위 간격", "Refresh options and limits":"새로고침 옵션 및 제한", "On-page overlay":"페이지 오버레이", "Content monitoring":"콘텐츠 모니터링", "Sound alerts":"소리 알림", "On-screen target alerts":"화면 알림", "Highlight and auto-scroll":"강조 표시 및 자동 스크롤", "Auto-Start rules":"자동 시작 규칙", "Permissions and troubleshooting":"권한 및 문제 해결", "Email Support":"이메일 지원", "Please email krabople@gmail.com from your preferred email app.":"원하는 이메일 앱에서 krabople@gmail.com으로 문의해 주세요.", "OK":"확인"
+    ],
+    "zh-Hans": [
+        "Complete Feature Guide":"完整功能指南", "Tap a feature for detailed instructions, limitations, and useful tips.":"轻点某项功能以查看详细说明、限制和实用提示。", "Auto Refresh XL Settings":"Auto Refresh XL 设置", "Contact Support":"联系支持", "Set up the extension":"设置扩展", "Allow the extension":"允许扩展", "Allow website access":"允许访问网站", "Open it in Safari":"在 Safari 中打开", "If it is missing":"如果未显示", "Intervals and countdowns":"间隔和倒计时", "Random interval range":"随机间隔范围", "Refresh options and limits":"刷新选项和限制", "On-page overlay":"页面悬浮组件", "Content monitoring":"内容监控", "Sound alerts":"声音提醒", "On-screen target alerts":"屏幕提醒", "Highlight and auto-scroll":"高亮和自动滚动", "Auto-Start rules":"自动启动规则", "Permissions and troubleshooting":"权限和故障排除", "Email Support":"电子邮件支持", "Please email krabople@gmail.com from your preferred email app.":"请使用您常用的邮件应用发送邮件至 krabople@gmail.com。", "OK":"好"
+    ],
+    "zh-Hant": [
+        "Complete Feature Guide":"完整功能指南", "Tap a feature for detailed instructions, limitations, and useful tips.":"點按功能以查看詳細說明、限制和實用提示。", "Auto Refresh XL Settings":"Auto Refresh XL 設定", "Contact Support":"聯絡支援", "Set up the extension":"設定擴充功能", "Allow the extension":"允許擴充功能", "Allow website access":"允許取用網站", "Open it in Safari":"在 Safari 中開啟", "If it is missing":"如果沒有顯示", "Intervals and countdowns":"間隔和倒數", "Random interval range":"隨機間隔範圍", "Refresh options and limits":"重新整理選項和限制", "On-page overlay":"頁面浮動小工具", "Content monitoring":"內容監控", "Sound alerts":"聲音提醒", "On-screen target alerts":"畫面提醒", "Highlight and auto-scroll":"醒目提示和自動捲動", "Auto-Start rules":"自動啟動規則", "Permissions and troubleshooting":"權限和疑難排解", "Email Support":"電子郵件支援", "Please email krabople@gmail.com from your preferred email app.":"請使用偏好的郵件 App 傳送郵件至 krabople@gmail.com。", "OK":"好"
+    ]
+]
+
+private func L(_ source: String) -> String {
+    let preferred = Locale.preferredLanguages.first ?? "en"
+    let code: String
+    if preferred.hasPrefix("zh-Hant") { code = "zh-Hant" }
+    else if preferred.hasPrefix("zh-Hans") || preferred.hasPrefix("zh-CN") { code = "zh-Hans" }
+    else { code = String(preferred.prefix(2)) }
+    return appTranslations[code]?[source] ?? source
+}
+
 private struct GuideSection { let title: String; let body: String }
 private struct FeatureGuide { let icon: String; let title: String; let summary: String; let sections: [GuideSection] }
 
@@ -40,9 +82,9 @@ private final class FeatureRowControl: UIControl {
         icon.translatesAutoresizingMaskIntoConstraints = false
         iconBackground.addSubview(icon)
 
-        let title = UILabel(); title.text = feature.title; title.textColor = AppTheme.primary
+        let title = UILabel(); title.text = L(feature.title); title.textColor = AppTheme.primary
         title.font = .systemFont(ofSize: 15, weight: .bold); title.numberOfLines = 0; title.textAlignment = .left
-        let summary = UILabel(); summary.text = feature.summary; summary.textColor = AppTheme.secondary
+        let summary = UILabel(); summary.text = L(feature.summary); summary.textColor = AppTheme.secondary
         summary.font = .systemFont(ofSize: 12); summary.numberOfLines = 0; summary.textAlignment = .left
         let words = UIStackView(arrangedSubviews: [title, summary]); words.axis = .vertical; words.spacing = 4
         let chevron = UIImageView(image: UIImage(systemName: "chevron.right")); chevron.tintColor = AppTheme.secondary; chevron.contentMode = .scaleAspectFit
@@ -58,8 +100,8 @@ private final class FeatureRowControl: UIControl {
             row.topAnchor.constraint(equalTo: topAnchor, constant: 13), row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 13),
             row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -13), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -13)
         ])
-        accessibilityLabel = "\(feature.title). \(feature.summary)"
-        accessibilityHint = "Opens the detailed feature guide"
+        accessibilityLabel = "\(L(feature.title)). \(L(feature.summary))"
+        accessibilityHint = L("Opens the detailed feature guide")
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var isHighlighted: Bool { didSet { alpha = isHighlighted ? 0.68 : 1 } }
@@ -120,7 +162,7 @@ final class ViewController: UIViewController {
     }
 
     private func settingsButton() -> UIButton {
-        var config = UIButton.Configuration.filled(); config.title = "Auto Refresh XL Settings"; config.image = UIImage(systemName: "gearshape.fill")
+        var config = UIButton.Configuration.filled(); config.title = L("Auto Refresh XL Settings"); config.image = UIImage(systemName: "gearshape.fill")
         config.imagePadding = 8; config.baseBackgroundColor = AppTheme.cyan; config.baseForegroundColor = .black; config.cornerStyle = .medium
         let button = UIButton(configuration: config); button.heightAnchor.constraint(equalToConstant: 50).isActive = true
         button.addTarget(self, action: #selector(openSettingsGuide), for: .touchUpInside); return button
@@ -149,7 +191,7 @@ final class ViewController: UIViewController {
 
     private func supportButton() -> UIButton {
         var config = UIButton.Configuration.tinted()
-        config.title = "Contact Support"
+        config.title = L("Contact Support")
         config.image = UIImage(systemName: "envelope.fill")
         config.imagePadding = 8
         config.baseForegroundColor = AppTheme.cyan
@@ -158,7 +200,7 @@ final class ViewController: UIViewController {
         let button = UIButton(configuration: config)
         button.heightAnchor.constraint(equalToConstant: 48).isActive = true
         button.addTarget(self, action: #selector(contactSupport), for: .touchUpInside)
-        button.accessibilityHint = "Creates an email to krabople@gmail.com"
+        button.accessibilityHint = L("Creates an email to krabople@gmail.com")
         return button
     }
 
@@ -206,8 +248,8 @@ final class ViewController: UIViewController {
         components.path = "krabople@gmail.com"
         components.queryItems = [URLQueryItem(name: "subject", value: "Auto Refresh XL Support")]
         guard let url = components.url, UIApplication.shared.canOpenURL(url) else {
-            let alert = UIAlertController(title: "Email Support", message: "Please email krabople@gmail.com from your preferred email app.", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            let alert = UIAlertController(title: L("Email Support"), message: L("Please email krabople@gmail.com from your preferred email app."), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L("OK"), style: .default))
             present(alert, animated: true)
             return
         }
@@ -215,7 +257,7 @@ final class ViewController: UIViewController {
     }
 
     private func cardView() -> UIView { let view = UIView(); view.backgroundColor = AppTheme.card; view.layer.cornerRadius = 14; view.layer.borderWidth = 1; view.layer.borderColor = UIColor(red: 31/255, green: 57/255, blue: 78/255, alpha: 1).cgColor; return view }
-    private func label(_ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ color: UIColor) -> UILabel { let result = UILabel(); result.text = text; result.font = .systemFont(ofSize: size, weight: weight); result.textColor = color; return result }
+    private func label(_ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ color: UIColor) -> UILabel { let result = UILabel(); result.text = L(text); result.font = .systemFont(ofSize: size, weight: weight); result.textColor = color; return result }
 
     private static let features: [FeatureGuide] = [
         FeatureGuide(icon: "timer", title: "Intervals and countdowns", summary: "Preset or custom refresh timing", sections: [
@@ -267,7 +309,7 @@ private final class FeatureDetailViewController: UIViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func viewDidLoad() {
-        super.viewDidLoad(); title = feature.title; view.backgroundColor = AppTheme.background
+        super.viewDidLoad(); title = L(feature.title); view.backgroundColor = AppTheme.background
         let scroll = UIScrollView(); let stack = UIStackView(); scroll.translatesAutoresizingMaskIntoConstraints = false; stack.translatesAutoresizingMaskIntoConstraints = false; stack.axis = .vertical; stack.spacing = 14
         view.addSubview(scroll); scroll.addSubview(stack)
         NSLayoutConstraint.activate([scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor), scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor), stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 18), stack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor, constant: 16), stack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor, constant: -16), stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -28)])
@@ -281,5 +323,5 @@ private final class FeatureDetailViewController: UIViewController {
             NSLayoutConstraint.activate([words.topAnchor.constraint(equalTo: card.topAnchor, constant: 15), words.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 15), words.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -15), words.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -15)]); stack.addArrangedSubview(card)
         }
     }
-    private func makeLabel(_ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ color: UIColor) -> UILabel { let value = UILabel(); value.text = text; value.font = .systemFont(ofSize: size, weight: weight); value.textColor = color; return value }
+    private func makeLabel(_ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ color: UIColor) -> UILabel { let value = UILabel(); value.text = L(text); value.font = .systemFont(ofSize: size, weight: weight); value.textColor = color; return value }
 }

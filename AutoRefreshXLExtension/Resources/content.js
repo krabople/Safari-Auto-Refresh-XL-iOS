@@ -312,7 +312,7 @@
       if (overlayShadow) {
         const statusBadge = overlayShadow.querySelector('.arp-status-badge');
         if (statusBadge) {
-          statusBadge.textContent = 'TARGET DETECTED!';
+          statusBadge.textContent = ARXL_I18N.t('TARGET DETECTED!');
           statusBadge.className = 'arp-status-badge arp-detected';
         }
       }
@@ -343,10 +343,10 @@
 
     banner.innerHTML = `
       <div style="font-size: 18px; font-weight: 800; color: #00f2fe; margin-bottom: 4px;">
-        🎯 TARGET DETECTED!
+        🎯 ${ARXL_I18N.t('TARGET DETECTED!')}
       </div>
       <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
-        Keyword <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> was detected on the monitored page.
+        ${ARXL_I18N.t('Keyword')} <strong style="color: #fff;">"${escapeHTML(targetText)}"</strong> ${ARXL_I18N.t('was detected on the monitored page.')}
       </div>
       ${showEnableSoundButton ? `<button id="arp-banner-enable-sound" style="
         background: #15803d;
@@ -358,7 +358,7 @@
         font-weight: 800;
         font-size: 13px;
         cursor: pointer;
-      ">Enable Sound</button>` : ''}
+      ">${ARXL_I18N.t('Enable Sound')}</button>` : ''}
       ${showOpenTabButton ? `<button id="arp-banner-open-tab" style="
         background: linear-gradient(135deg, #00f2fe, #0284c7);
         color: #000;
@@ -369,7 +369,7 @@
         font-weight: 800;
         font-size: 13px;
         cursor: pointer;
-      ">View Monitored Tab</button>` : ''}
+      ">${ARXL_I18N.t('View Monitored Tab')}</button>` : ''}
       <button id="arp-banner-dismiss" style="
         background: linear-gradient(135deg, #00f2fe, #0284c7);
         color: #000;
@@ -858,16 +858,16 @@
       <div class="arp-body">
         <div class="arp-countdown-row">
           <div class="arp-countdown-time" id="arp-timer-val">--:--</div>
-          <div class="arp-status-badge" id="arp-status-val">ACTIVE</div>
+          <div class="arp-status-badge" id="arp-status-val">${ARXL_I18N.t('ACTIVE')}</div>
         </div>
         <div class="arp-info-row">
-          <span id="arp-mode-val">Fixed Interval</span>
-          <span id="arp-count-val">Refreshes: 0</span>
+          <span id="arp-mode-val">${ARXL_I18N.t('Fixed Interval')}</span>
+          <span id="arp-count-val">${ARXL_I18N.t('Refreshes:')} 0</span>
         </div>
         <div class="arp-monitor-term" id="arp-monitor-term" hidden></div>
-        <button class="arp-btn arp-btn-sound" id="arp-enable-sound-btn">🔊 Enable Alert Sound</button>
+        <button class="arp-btn arp-btn-sound" id="arp-enable-sound-btn">🔊 ${ARXL_I18N.t('Enable Alert Sound')}</button>
         <div class="arp-actions">
-          <button class="arp-btn arp-btn-danger" id="arp-stop-btn">Stop Refresh</button>
+          <button class="arp-btn arp-btn-danger" id="arp-stop-btn">${ARXL_I18N.t('Stop Refresh')}</button>
         </div>
       </div>
     `;
@@ -951,7 +951,7 @@
     const context = getUnlockedAudioContext();
     if (!context) {
       audioUnlocked = false;
-      updateSoundEnableControl('Audio is unavailable');
+      updateSoundEnableControl(ARXL_I18N.t('Audio is unavailable'));
       return;
     }
 
@@ -970,7 +970,7 @@
     } catch (error) {
       audioUnlocked = false;
       logDebug('SOUND', 'Could not enable alerts: ' + error.message, 'error');
-      updateSoundEnableControl('Tap again to enable sound');
+      updateSoundEnableControl(ARXL_I18N.t('Tap again to enable sound'));
     }
   }
 
@@ -1002,8 +1002,8 @@
     const isEnabled = soundAlertsEnabled;
     button.classList.toggle('is-enabled', isEnabled);
     button.textContent = isEnabled
-      ? '🔇 Disable Alert Sound'
-      : (failureText || '🔊 Enable Alert Sound');
+      ? `🔇 ${ARXL_I18N.t('Disable Alert Sound')}`
+      : (failureText || `🔊 ${ARXL_I18N.t('Enable Alert Sound')}`);
   }
 
   function setSoundPreference(enabled) {
@@ -1041,16 +1041,16 @@
 
     if (countVal) {
       if (maxRefreshes > 0) {
-        countVal.textContent = `Refreshes: ${refreshCount}/${maxRefreshes}`;
+        countVal.textContent = `${ARXL_I18N.t('Refreshes:')} ${refreshCount}/${maxRefreshes}`;
       } else {
-        countVal.textContent = `Refreshes: ${refreshCount}`;
+        countVal.textContent = `${ARXL_I18N.t('Refreshes:')} ${refreshCount}`;
       }
     }
 
     if (modeVal && currentTabState) {
       modeVal.textContent = currentTabState.mode === 'random'
-        ? `Random (${currentTabState.minInterval}-${currentTabState.maxInterval}s)`
-        : `Every ${currentTabState.interval}s`;
+        ? `${ARXL_I18N.t('Random')} (${currentTabState.minInterval}-${currentTabState.maxInterval}s)`
+        : `${ARXL_I18N.t('Every')} ${currentTabState.interval}s`;
     }
     updateOverlayMonitorTerm();
   }
@@ -1063,7 +1063,7 @@
       ? String(currentTabState.targetText || '').trim()
       : '';
     term.hidden = !monitoredText;
-    term.textContent = monitoredText ? `Monitoring: “${monitoredText}”` : '';
+    term.textContent = monitoredText ? `${ARXL_I18N.t('Monitoring:')} “${monitoredText}”` : '';
     term.title = monitoredText;
   }
 

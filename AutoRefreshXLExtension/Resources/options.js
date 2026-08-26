@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  const t = (window.ARXL_I18N && window.ARXL_I18N.t) || (value => value);
   const rulesList = document.getElementById('rulesList');
   const editPanel = document.getElementById('editPanel');
   const editUrl = document.getElementById('editUrl');
@@ -22,18 +23,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function render() {
     const rules = await readRules();
     if (!rules.length) {
-      rulesList.innerHTML = '<div style="color:#64748b;font-style:italic;">No Auto-Start rules created yet.</div>';
+      rulesList.innerHTML = `<div style="color:#64748b;font-style:italic;">${t('No Auto-Start rules created yet.')}</div>`;
       return;
     }
     rulesList.innerHTML = rules.map((rule, index) => `
       <div class="rule-item">
         <div>
           <div class="rule-url">${escapeHTML(rule.exactUrl || rule.pattern)}</div>
-          <div class="rule-meta">${rule.urlMatch === 'exact' || rule.exactUrl ? 'Exact page' : 'URL pattern'} · ${Number(rule.settings && rule.settings.interval) || 10}s</div>
+          <div class="rule-meta">${rule.urlMatch === 'exact' || rule.exactUrl ? t('Exact page') : t('URL pattern')} · ${Number(rule.settings && rule.settings.interval) || 10}s</div>
         </div>
         <div class="rule-actions">
-          <button class="rule-button btn-edit" data-edit="${index}">Edit</button>
-          <button class="rule-button btn-delete" data-delete="${index}">Delete</button>
+          <button class="rule-button btn-edit" data-edit="${index}">${t('Edit')}</button>
+          <button class="rule-button btn-delete" data-delete="${index}">${t('Delete')}</button>
         </div>
       </div>`).join('');
 
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       editUrl.focus();
     }));
     rulesList.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', async () => {
-      if (!confirm('Delete this Auto-Start rule?')) return;
+      if (!confirm(t('Delete this Auto-Start rule?'))) return;
       rules.splice(Number(button.dataset.delete), 1);
       await chrome.storage.local.set({ autoStartRules: rules });
       closeEditor();
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('saveEdit').addEventListener('click', async () => {
     const url = editUrl.value.trim();
     if (!/^https?:\/\//i.test(url)) {
-      alert('Enter a complete URL beginning with http:// or https://.');
+      alert(t('Enter a complete URL beginning with http:// or https://.'));
       return;
     }
     const rules = await readRules();

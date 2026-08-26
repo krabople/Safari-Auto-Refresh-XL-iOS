@@ -1,0 +1,86 @@
+{
+  "en-GB": {
+    "name": "Auto Refresh XL for Safari",
+    "subtitle": "Page Monitor, Timer & Alerts",
+    "promotionalText": "Refresh Safari pages automatically, monitor text changes and receive visible and audible alerts when the content you need appears or disappears.",
+    "keywords": "reload,website,webpage,interval,countdown,keyword,text,watcher,automation,notification",
+    "description": "Auto Refresh XL is a powerful Safari extension for automatically refreshing webpages and monitoring them for important changes.\n\nAUTOMATIC PAGE REFRESHING\n• Choose preset or custom refresh intervals\n• Use fixed or random timing\n• Set an optional refresh limit\n• Request a hard refresh where Safari supports it\n• Stop refreshing when you interact with the page\n\nPAGE MONITORING\n• Watch for text that appears or disappears\n• Match plain text, regular expressions or XPath\n• Stop automatically when the target condition is met\n• Highlight and scroll to matching content\n• Receive a clear on-screen alert and audible notification\n\nCONVENIENT CONTROLS\n• Follow the countdown using a draggable on-page widget\n• Keep widget position and sound preference between refreshes\n• Save exact-page Auto-Start rules\n• Manage everything from Safari’s extension menu\n\nMonitoring is performed locally on your device. Auto Refresh XL does not collect or transmit webpage content or monitored terms.\n\nSafari must remain open and visible for reliable refreshing and monitoring. Some Safari internal pages, inaccessible frames, images, canvas content and websites without extension permission cannot be monitored."
+  },
+  "en-US": {
+    "name": "Auto Refresh XL for Safari",
+    "subtitle": "Page Monitor, Timer & Alerts",
+    "promotionalText": "Refresh Safari pages automatically, monitor text changes, and get visible and audible alerts when the content you need appears or disappears.",
+    "keywords": "reload,website,webpage,interval,countdown,keyword,text,watcher,automation,notification",
+    "description": "Auto Refresh XL is a powerful Safari extension for automatically refreshing webpages and monitoring them for important changes.\n\nAUTOMATIC PAGE REFRESHING\n• Choose preset or custom refresh intervals\n• Use fixed or random timing\n• Set an optional refresh limit\n• Request a hard refresh where Safari supports it\n• Stop refreshing when you interact with the page\n\nPAGE MONITORING\n• Watch for text that appears or disappears\n• Match plain text, regular expressions, or XPath\n• Stop automatically when the target condition is met\n• Highlight and scroll to matching content\n• Receive a clear on-screen alert and audible notification\n\nCONVENIENT CONTROLS\n• Follow the countdown using a draggable on-page widget\n• Keep widget position and sound preference between refreshes\n• Save exact-page Auto-Start rules\n• Manage everything from Safari’s extension menu\n\nMonitoring is performed locally on your device. Auto Refresh XL does not collect or transmit webpage content or monitored terms.\n\nSafari must remain open and visible for reliable refreshing and monitoring. Some Safari internal pages, inaccessible frames, images, canvas content, and websites without extension permission cannot be monitored."
+  },
+  "de-DE": {
+    "name": "Auto Refresh XL für Safari",
+    "subtitle": "Seitenwächter, Timer & Alarme",
+    "promotionalText": "Safari-Seiten automatisch aktualisieren, Textänderungen überwachen und sichtbare sowie akustische Alarme erhalten.",
+    "keywords": "neu laden,webseite,intervall,countdown,schlüsselwort,text,wächter,automation,benachrichtigung",
+    "description": "Auto Refresh XL ist eine leistungsstarke Safari-Erweiterung zum automatischen Aktualisieren von Webseiten und Überwachen wichtiger Änderungen.\n\nAUTOMATISCHE AKTUALISIERUNG\n• Vorgegebene oder eigene Intervalle wählen\n• Feste oder zufällige Zeiten verwenden\n• Optionales Aktualisierungslimit festlegen\n• Vollständige Aktualisierung anfordern, sofern Safari dies unterstützt\n• Bei Interaktion mit der Seite automatisch stoppen\n\nSEITENÜBERWACHUNG\n• Auf erscheinenden oder verschwindenden Text warten\n• Einfachen Text, reguläre Ausdrücke oder XPath verwenden\n• Bei erfüllter Bedingung automatisch stoppen\n• Treffer hervorheben und automatisch dorthin scrollen\n• Sichtbaren Alarm und akustische Benachrichtigung erhalten\n\nPRAKTISCHE STEUERUNG\n• Countdown in einem verschiebbaren Widget verfolgen\n• Widget-Position und Toneinstellung über Aktualisierungen hinweg behalten\n• Auto-Start-Regeln für genaue Seiten speichern\n• Alles über das Erweiterungsmenü von Safari verwalten\n\nDie Überwachung erfolgt lokal auf deinem Gerät. Auto Refresh XL sammelt oder überträgt weder Webseiteninhalte noch überwachte Begriffe.\n\nSafari muss für eine zuverlässige Aktualisierung und Überwachung geöffnet und sichtbar bleiben. Interne Safari-Seiten, unzugängliche Frames, Bilder, Canvas-Inhalte und Seiten ohne Erweiterungsberechtigung können nicht überwacht werden."
+  },
+  "fr-FR": {
+    "name": "Auto Refresh XL pour Safari",
+    "subtitle": "Surveillance, timer & alertes",
+    "promotionalText": "Actualisez automatiquement les pages Safari, surveillez les changements de texte et recevez des alertes visuelles et sonores.",
+    "keywords": "recharger,site web,page web,intervalle,compte à rebours,mot clé,texte,veille,automatisation",
+    "description": "Auto Refresh XL est une extension Safari puissante qui actualise automatiquement les pages web et surveille les changements importants.\n\nACTUALISATION AUTOMATIQUE\n• Choisissez un intervalle prédéfini ou personnalisé\n• Utilisez une fréquence fixe ou aléatoire\n• Définissez une limite d’actualisations facultative\n• Demandez une actualisation forcée lorsque Safari le permet\n• Arrêtez l’actualisation lorsque vous interagissez avec la page\n\nSURVEILLANCE DES PAGES\n• Surveillez l’apparition ou la disparition d’un texte\n• Utilisez du texte simple, une expression régulière ou XPath\n• Arrêtez automatiquement lorsque la condition est satisfaite\n• Surlignez le résultat et faites défiler la page jusqu’à lui\n• Recevez une alerte visible et une notification sonore\n\nCOMMANDES PRATIQUES\n• Suivez le compte à rebours dans un widget déplaçable\n• Conservez la position du widget et le réglage sonore après actualisation\n• Enregistrez des règles de démarrage auto pour des pages exactes\n• Gérez tout depuis le menu des extensions de Safari\n\nLa surveillance s’effectue localement sur votre appareil. Auto Refresh XL ne collecte ni ne transmet le contenu des pages ou les termes surveillés.\n\nSafari doit rester ouvert et visible pour assurer une actualisation et une surveillance fiables. Les pages internes de Safari, cadres inaccessibles, images, contenus canvas et sites sans autorisation ne peuvent pas être surveillés."
+  },
+  "es-ES": {
+    "name": "Auto Refresh XL para Safari",
+    "subtitle": "Monitor web, timer y alertas",
+    "promotionalText": "Recarga páginas de Safari automáticamente, monitoriza cambios de texto y recibe alertas visibles y sonoras.",
+    "keywords": "recargar,sitio web,página,intervalo,cuenta atrás,palabra clave,texto,vigilancia,automatización",
+    "description": "Auto Refresh XL es una potente extensión de Safari para recargar páginas web automáticamente y monitorizar cambios importantes.\n\nRECARGA AUTOMÁTICA\n• Elige intervalos predefinidos o personalizados\n• Utiliza tiempos fijos o aleatorios\n• Establece un límite de recargas opcional\n• Solicita una recarga completa cuando Safari lo permita\n• Detén la recarga cuando interactúes con la página\n\nMONITORIZACIÓN DE PÁGINAS\n• Vigila texto que aparece o desaparece\n• Usa texto simple, expresiones regulares o XPath\n• Detén el proceso al cumplirse la condición\n• Resalta el resultado y desplázate hasta él\n• Recibe una alerta visible y una notificación sonora\n\nCONTROLES PRÁCTICOS\n• Sigue la cuenta atrás en un widget arrastrable\n• Conserva la posición del widget y el sonido tras cada recarga\n• Guarda reglas de inicio automático para páginas exactas\n• Gestiona todo desde el menú de extensiones de Safari\n\nLa monitorización se realiza localmente en tu dispositivo. Auto Refresh XL no recopila ni transmite el contenido de las páginas ni los términos monitorizados.\n\nSafari debe permanecer abierto y visible para una recarga y monitorización fiables. No se pueden monitorizar páginas internas de Safari, marcos inaccesibles, imágenes, contenido canvas ni sitios sin permiso para la extensión."
+  },
+  "it-IT": {
+    "name": "Auto Refresh XL per Safari",
+    "subtitle": "Monitor pagine, timer e avvisi",
+    "promotionalText": "Aggiorna automaticamente le pagine Safari, monitora le modifiche al testo e ricevi avvisi visivi e sonori.",
+    "keywords": "ricarica,sito web,pagina web,intervallo,conto alla rovescia,parola chiave,testo,automazione",
+    "description": "Auto Refresh XL è una potente estensione Safari per aggiornare automaticamente le pagine web e monitorare cambiamenti importanti.\n\nAGGIORNAMENTO AUTOMATICO\n• Scegli intervalli predefiniti o personalizzati\n• Usa tempi fissi o casuali\n• Imposta un limite facoltativo\n• Richiedi un aggiornamento completo quando Safari lo consente\n• Interrompi l’aggiornamento quando interagisci con la pagina\n\nMONITORAGGIO DELLA PAGINA\n• Controlla quando un testo appare o scompare\n• Usa testo semplice, espressioni regolari o XPath\n• Interrompi automaticamente quando la condizione è soddisfatta\n• Evidenzia il risultato e scorri fino all’elemento\n• Ricevi un avviso visibile e una notifica sonora\n\nCONTROLLI PRATICI\n• Segui il conto alla rovescia con un widget trascinabile\n• Mantieni posizione del widget e preferenza audio dopo l’aggiornamento\n• Salva regole di avvio automatico per pagine esatte\n• Gestisci tutto dal menu delle estensioni di Safari\n\nIl monitoraggio avviene localmente sul dispositivo. Auto Refresh XL non raccoglie né trasmette contenuti delle pagine o termini monitorati.\n\nSafari deve rimanere aperto e visibile. Non è possibile monitorare pagine interne di Safari, frame inaccessibili, immagini, contenuti canvas o siti senza autorizzazione."
+  },
+  "pt-BR": {
+    "name": "Auto Refresh XL para Safari",
+    "subtitle": "Monitor, timer e alertas",
+    "promotionalText": "Atualize páginas do Safari automaticamente, monitore alterações de texto e receba alertas visuais e sonoros.",
+    "keywords": "recarregar,site,página,intervalo,contagem regressiva,palavra-chave,texto,vigilância,automação",
+    "description": "Auto Refresh XL é uma poderosa extensão do Safari para atualizar páginas automaticamente e monitorar mudanças importantes.\n\nATUALIZAÇÃO AUTOMÁTICA\n• Escolha intervalos predefinidos ou personalizados\n• Use tempos fixos ou aleatórios\n• Defina um limite opcional de atualizações\n• Solicite uma atualização completa quando o Safari permitir\n• Pare quando você interagir com a página\n\nMONITORAMENTO DE PÁGINAS\n• Observe textos que aparecem ou desaparecem\n• Use texto simples, expressões regulares ou XPath\n• Pare automaticamente quando a condição for atendida\n• Destaque o resultado e role até o elemento\n• Receba um alerta visível e uma notificação sonora\n\nCONTROLES PRÁTICOS\n• Acompanhe a contagem regressiva em um widget arrastável\n• Mantenha a posição do widget e a preferência de som após atualizações\n• Salve regras de início automático para páginas exatas\n• Gerencie tudo pelo menu de extensões do Safari\n\nO monitoramento ocorre localmente no dispositivo. Auto Refresh XL não coleta nem transmite o conteúdo das páginas ou os termos monitorados.\n\nO Safari deve permanecer aberto e visível. Páginas internas, frames inacessíveis, imagens, conteúdo canvas e sites sem permissão para a extensão não podem ser monitorados."
+  },
+  "nl-NL": {
+    "name": "Auto Refresh XL voor Safari",
+    "subtitle": "Paginacontrole, timer & alert",
+    "promotionalText": "Ververs Safari-pagina’s automatisch, controleer tekstwijzigingen en ontvang zichtbare en hoorbare meldingen.",
+    "keywords": "herladen,website,webpagina,interval,aftellen,trefwoord,tekst,bewaker,automatisering,notificatie",
+    "description": "Auto Refresh XL is een krachtige Safari-extensie waarmee je webpagina’s automatisch ververst en belangrijke wijzigingen controleert.\n\nAUTOMATISCH VERVERSEN\n• Kies vooraf ingestelde of aangepaste intervallen\n• Gebruik vaste of willekeurige timing\n• Stel optioneel een verversingslimiet in\n• Vraag een volledige verversing aan wanneer Safari dit ondersteunt\n• Stop wanneer je de pagina gebruikt\n\nPAGINACONTROLE\n• Controleer of tekst verschijnt of verdwijnt\n• Gebruik platte tekst, reguliere expressies of XPath\n• Stop automatisch wanneer aan de voorwaarde wordt voldaan\n• Markeer het resultaat en scrol ernaartoe\n• Ontvang een zichtbare melding en een geluidssignaal\n\nHANDIGE BEDIENING\n• Volg het aftellen met een versleepbare widget\n• Bewaar de widgetpositie en geluidsvoorkeur na verversen\n• Sla regels op voor het automatisch starten van exacte pagina’s\n• Beheer alles via het extensiemenu van Safari\n\nDe controle vindt lokaal op je apparaat plaats. Auto Refresh XL verzamelt of verstuurt geen pagina-inhoud of gecontroleerde termen.\n\nSafari moet geopend en zichtbaar blijven. Interne Safari-pagina’s, ontoegankelijke frames, afbeeldingen, canvasinhoud en sites zonder toestemming kunnen niet worden gecontroleerd."
+  },
+  "ja-JP": {
+    "name": "Safari向けAuto Refresh XL",
+    "subtitle": "ページ監視・タイマー・通知",
+    "promotionalText": "Safariページを自動更新し、テキストの変化を監視して、画面とサウンドで通知します。",
+    "keywords": "再読込,サイト,間隔,計時,キーワード,テキスト,監視,自動化,通知",
+    "description": "Auto Refresh XLは、Webページを自動更新して重要な変化を監視するSafari拡張機能です。\n\nページの自動更新\n• プリセットまたはカスタムの更新間隔\n• 固定またはランダムなタイミング\n• 更新回数の上限を設定\n• Safariが対応する場合は完全更新を要求\n• ページを操作したときに更新を停止\n\nページ監視\n• テキストの表示または消失を監視\n• プレーンテキスト、正規表現、XPathに対応\n• 条件が満たされたら自動停止\n• 一致した内容を強調表示して自動スクロール\n• 画面上の通知とサウンド通知\n\n便利な操作\n• 移動できるウィジェットでカウントダウンを確認\n• 更新後もウィジェット位置とサウンド設定を維持\n• 正確なページURLの自動開始ルールを保存\n• Safariの拡張機能メニューから管理\n\n監視はデバイス上で処理されます。ページ内容や監視する語句を収集・送信しません。\n\n安定した動作にはSafariを開いて表示したままにする必要があります。Safariの内部ページ、アクセスできないフレーム、画像、canvas、許可されていないサイトは監視できません。"
+  },
+  "ko-KR": {
+    "name": "Safari용 Auto Refresh XL",
+    "subtitle": "페이지 모니터, 타이머, 알림",
+    "promotionalText": "Safari 페이지를 자동으로 새로고침하고 텍스트 변경을 모니터링하여 화면 및 소리 알림을 받으세요.",
+    "keywords": "다시로드,웹사이트,간격,카운트다운,키워드,텍스트,감시,자동화,알림",
+    "description": "Auto Refresh XL은 웹페이지를 자동으로 새로고침하고 중요한 변경 사항을 모니터링하는 Safari 확장 프로그램입니다.\n\n자동 페이지 새로고침\n• 사전 설정 또는 사용자 지정 간격 선택\n• 고정 또는 무작위 시간 사용\n• 선택적 새로고침 횟수 제한\n• Safari가 지원하는 경우 강력 새로고침 요청\n• 페이지와 상호 작용하면 자동 중지\n\n페이지 모니터링\n• 텍스트가 나타나거나 사라지는지 확인\n• 일반 텍스트, 정규식 또는 XPath 사용\n• 조건이 충족되면 자동으로 중지\n• 일치 항목을 강조하고 자동 스크롤\n• 화면 알림 및 소리 알림 수신\n\n편리한 제어\n• 드래그 가능한 위젯에서 카운트다운 확인\n• 새로고침 후에도 위젯 위치와 소리 설정 유지\n• 정확한 페이지의 자동 시작 규칙 저장\n• Safari 확장 프로그램 메뉴에서 모두 관리\n\n모니터링은 기기에서 로컬로 처리됩니다. Auto Refresh XL은 페이지 콘텐츠나 모니터링 용어를 수집하거나 전송하지 않습니다.\n\n안정적인 동작을 위해 Safari를 열어 두고 화면에 표시해야 합니다. Safari 내부 페이지, 접근할 수 없는 프레임, 이미지, canvas 콘텐츠 및 권한이 없는 사이트는 모니터링할 수 없습니다."
+  },
+  "zh-Hans": {
+    "name": "Safari 自动刷新 XL",
+    "subtitle": "网页监控、计时器与提醒",
+    "promotionalText": "自动刷新 Safari 页面、监控文本变化，并在目标内容出现或消失时通过屏幕和声音提醒您。",
+    "keywords": "重新加载,网站,网页,间隔,倒计时,关键词,文本,监测,自动化,通知",
+    "description": "Auto Refresh XL 是一款 Safari 扩展，可自动刷新网页并监控重要变化。\n\n自动刷新网页\n• 选择预设或自定义刷新间隔\n• 使用固定或随机时间\n• 设置可选的刷新次数上限\n• 在 Safari 支持时请求强制刷新\n• 与页面交互时自动停止\n\n网页监控\n• 监控文本出现或消失\n• 支持纯文本、正则表达式和 XPath\n• 满足目标条件时自动停止\n• 高亮匹配内容并自动滚动\n• 接收清晰的屏幕提醒和声音通知\n\n便捷控制\n• 通过可拖动的页面组件查看倒计时\n• 刷新后保留组件位置和声音偏好\n• 保存精确网址的自动启动规则\n• 从 Safari 扩展菜单管理所有功能\n\n监控在设备本地完成。Auto Refresh XL 不会收集或传输网页内容或监控词语。\n\n为了可靠地刷新和监控，Safari 必须保持打开并显示。无法监控 Safari 内部页面、无法访问的框架、图片、canvas 内容和未授予扩展权限的网站。"
+  },
+  "zh-Hant": {
+    "name": "Safari 自動重新整理 XL",
+    "subtitle": "網頁監控、計時器與提醒",
+    "promotionalText": "自動重新整理 Safari 頁面、監控文字變化，並在目標內容出現或消失時以畫面和聲音提醒。",
+    "keywords": "重新載入,網站,網頁,間隔,倒數,關鍵字,文字,監測,自動化,通知",
+    "description": "Auto Refresh XL 是一款 Safari 擴充功能，可自動重新整理網頁並監控重要變化。\n\n自動重新整理網頁\n• 選擇預設或自訂的重新整理間隔\n• 使用固定或隨機時間\n• 設定選用的重新整理次數上限\n• 在 Safari 支援時要求強制重新整理\n• 與頁面互動時自動停止\n\n網頁監控\n• 監控文字出現或消失\n• 支援純文字、規則運算式和 XPath\n• 符合目標條件時自動停止\n• 醒目提示相符內容並自動捲動\n• 接收清楚的畫面提醒和聲音通知\n\n便利控制\n• 使用可拖曳的頁面小工具查看倒數\n• 重新整理後保留小工具位置和聲音偏好\n• 儲存精確網址的自動啟動規則\n• 從 Safari 擴充功能選單管理所有功能\n\n監控會在裝置本機執行。Auto Refresh XL 不會收集或傳送網頁內容或監控詞語。\n\n為確保可靠地重新整理和監控，Safari 必須保持開啟並顯示。無法監控 Safari 內部頁面、無法取用的框架、圖片、canvas 內容及未授予擴充功能權限的網站。"
+  }
+}
