@@ -154,17 +154,19 @@ jobs:
         fi
 
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-        CERT_NAME=$(security find-identity -v -p codesigning $KEYCHAIN_PATH 2>/dev/null | grep "Apple Distribution" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
-        if [ -z "$CERT_NAME" ]; then
-          CERT_NAME=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+        CERT_HASH=$(security find-identity -v -p codesigning $KEYCHAIN_PATH 2>/dev/null | grep "Apple Distribution" | head -n 1 | awk '{print $2}')
+        if [ -z "$CERT_HASH" ]; then
+          CERT_HASH=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -n 1 | awk '{print $2}')
         fi
 
-        if [ -n "$CERT_NAME" ]; then
-          echo "Re-signing app and extensions with official Apple Distribution identity: '$CERT_NAME'..."
+        echo "Extracted Apple Distribution Certificate SHA1 Hash: '$CERT_HASH'"
+
+        if [ -n "$CERT_HASH" ]; then
+          echo "Re-signing app and extensions with official Apple Distribution identity ($CERT_HASH)..."
           find "$TARGET_APP_DIR/PlugIns" -name "*.appex" -type d 2>/dev/null | while read -r appex; do
-            codesign --force --sign "$CERT_NAME" --timestamp "$appex"
+            codesign --force --keychain "$KEYCHAIN_PATH" --sign "$CERT_HASH" --timestamp "$appex"
           done
-          codesign --force --sign "$CERT_NAME" --timestamp "$TARGET_APP_DIR"
+          codesign --force --keychain "$KEYCHAIN_PATH" --sign "$CERT_HASH" --timestamp "$TARGET_APP_DIR"
           echo "Successfully code-signed application with Apple Distribution certificate!"
         fi
 
