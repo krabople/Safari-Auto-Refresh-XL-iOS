@@ -110,7 +110,7 @@ jobs:
           done
 
           XCODE_PROJECT="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name '*.xcodeproj' -print -quit)"
-          SCHEME="$(xcodebuild -list -project "$XCODE_PROJECT" | awk '/Schemes:/{found=1; next} found && /\(iOS\)/{sub(/^[[:space:]]+/, ""); print; exit}')"
+          SCHEME="$(xcodebuild -list -project "$XCODE_PROJECT" | awk '/Schemes:/{found=1; next} found && NF{sub(/^[[:space:]]+/, ""); print; exit}')"
           if [ -z "$SCHEME" ]; then
             echo "Unable to identify the generated iOS scheme." >&2
             xcodebuild -list -project "$XCODE_PROJECT"
