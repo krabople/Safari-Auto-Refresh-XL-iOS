@@ -98,6 +98,10 @@
       if (currentTabState) currentTabState.enabled = false;
       stopMonitoringLoop();
       removeOverlay();
+    } else if (request.type === 'SOUND_PREFERENCE_SYNC') {
+      soundAlertsEnabled = request.enabled !== false;
+      if (currentTabState) currentTabState.soundEnabled = soundAlertsEnabled;
+      updateSoundEnableControl();
     } else if (request.type === 'TEST_SOUND') {
       playAlertSound();
     } else if (request.type === 'GET_AUDIO_STATUS') {
@@ -943,7 +947,7 @@
   async function enableAlertAudio() {
     soundAlertsEnabled = true;
     if (currentTabState) currentTabState.soundEnabled = true;
-    chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: true });
+    await setSoundPreference(true);
     const context = getUnlockedAudioContext();
     if (!context) {
       audioUnlocked = false;
@@ -975,7 +979,7 @@
       soundAlertsEnabled = false;
       if (currentTabState) currentTabState.soundEnabled = false;
       updateSoundEnableControl();
-      chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: false });
+      await setSoundPreference(false);
       return;
     }
 
@@ -1000,6 +1004,12 @@
     button.textContent = isEnabled
       ? '🔇 Disable Alert Sound'
       : (failureText || '🔊 Enable Alert Sound');
+  }
+
+  function setSoundPreference(enabled) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled }, () => resolve());
+    });
   }
 
   function applySavedOverlayPosition() {

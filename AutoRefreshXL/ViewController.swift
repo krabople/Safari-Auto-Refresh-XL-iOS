@@ -240,9 +240,9 @@ final class ViewController: UIViewController {
             GuideSection(title: "Appears or disappears", body: "Appears triggers when a match exists; Disappears triggers when it does not. Checks start after the first countdown."),
             GuideSection(title: "Dynamic sites", body: "The rendered page is checked immediately after refresh and watched for later changes. Inaccessible frames, images, canvas text, and closed components may not be detectable.")]),
         FeatureGuide(icon: "speaker.wave.3.fill", title: "Sound alerts", summary: "Safari-safe audible target alerts", sections: [
-            GuideSection(title: "Enabling sound", body: "Safari requires a webpage tap before it can play sound. Tap Enable Alert Sound on the overlay; the confirmation sound verifies it and the control changes to Disable Alert Sound."),
-            GuideSection(title: "Other tabs", body: "Alerts are routed to the tab you are viewing. If that webpage has not received a tap, Safari may block audio and the banner offers an Enable Sound button."),
-            GuideSection(title: "Limitations", body: "Reloading replaces a page’s audio context. Device volume, Safari media policy, and iOS resource suspension still apply. These are webpage sounds, not push notifications.")]),
+            GuideSection(title: "Enabling sound", body: "Use the overlay button to enable or disable alert sound. The preference remains selected when the monitored page refreshes."),
+            GuideSection(title: "Other tabs", body: "The iOS extension plays the primary alert sound natively, while the visible alert is routed to the ordinary Safari webpage you are viewing."),
+            GuideSection(title: "Limitations", body: "The Ring/Silent switch, device volume, Focus modes, and iOS resource suspension can affect alerts. Webpage audio remains available as a fallback when native sound cannot be started.")]),
         FeatureGuide(icon: "bell.badge.fill", title: "On-screen target alerts", summary: "Visible alerts across Safari tabs", sections: [
             GuideSection(title: "Cross-tab alerts", body: "The banner appears on the ordinary Safari webpage currently being viewed. View Monitored Tab returns to the source tab when needed."),
             GuideSection(title: "Limitations", body: "Safari cannot inject the banner into internal browser pages, Settings, some viewers, or pages without permission. It is not a Lock Screen push notification.")]),

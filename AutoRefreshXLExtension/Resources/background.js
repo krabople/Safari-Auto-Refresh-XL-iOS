@@ -367,6 +367,25 @@ async function requestFromTab(tabId, message) {
   }
 }
 
+async function playNativeAlertSound() {
+  if (!chrome.runtime.sendNativeMessage) {
+    return { success: false, error: 'Native messaging is unavailable' };
+  }
+  try {
+    return await new Promise((resolve) => {
+      chrome.runtime.sendNativeMessage('application.id', { type: 'PLAY_ALERT_SOUND' }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+        } else {
+          resolve(response || { success: false, error: 'No response from the native sound handler' });
+        }
+      });
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const senderTabId = sender.tab ? sender.tab.id : null;
   let resolvedTabId = (request.tabId !== undefined && request.tabId !== null) ? request.tabId : senderTabId;
@@ -491,11 +510,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'SET_SOUND_ENABLED') {
     const tabId = request.tabId || senderTabId || targetTabId;
-    if (tabId && activeTabStates[tabId]) {
-      activeTabStates[tabId].soundEnabled = request.enabled !== false;
-      saveTabStates();
-    }
-    sendResponse({ success: true });
+    (async () => {
+      if (tabId && activeTabStates[tabId]) {
+        activeTabStates[tabId].soundEnabled = request.enabled !== false;
+        await saveTabStates();
+        sendToTab(tabId, { type: 'SOUND_PREFERENCE_SYNC', enabled: activeTabStates[tabId].soundEnabled });
+      }
+      sendResponse({ success: true });
+    })();
     return true;
   }
 
@@ -535,7 +557,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
-    const presentOnActiveTab = async () => {
+    const presentOnActiveTab = async (playWebSound) => {
       try {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         const activeTab = tabs && tabs[0];
@@ -547,7 +569,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           targetText: targetTxt,
           sourceTabId: tabId,
           showOpenTabButton: !!tabId && activeTab.id !== tabId,
-          playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
+          playSound: playWebSound
         });
         if (result && result.success) return result;
 
@@ -559,7 +581,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             targetText: targetTxt,
             sourceTabId: tabId,
             showOpenTabButton: false,
-            playSound: (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false)
+            playSound: playWebSound
           });
         }
         return { success: false, error: (result && result.error) || 'The active tab could not present the alert' };
@@ -581,13 +603,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (chrome.alarms && tabId) {
           chrome.alarms.clear(`refresh_tab_${tabId}`);
         }
-        sendToTab(tabId, { type: 'REFRESH_STOPPED' });
-        addLog('TARGET', `Auto-refresh stopped for tab ${tabId} because target was detected`);
       }
 
     }
 
-    presentOnActiveTab().then(sendResponse);
+    (async () => {
+      const shouldPlaySound = (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false);
+      const nativeSound = shouldPlaySound
+        ? await playNativeAlertSound()
+        : { success: false, skipped: true };
+      if (shouldPlaySound && !nativeSound.success) {
+        addLog('SOUND', `Native alert unavailable; using webpage fallback: ${nativeSound.error || 'unknown error'}`, 'warn');
+      }
+
+      // Present before removing the overlay/stopped state. Safari can otherwise
+      // race the stop message against this second message, especially when a
+      // disappearing target has no matching DOM node to keep the task active.
+      const presentation = await presentOnActiveTab(shouldPlaySound && !nativeSound.success);
+
+      if (state && state.actionStop) {
+        await sendToTab(tabId, { type: 'REFRESH_STOPPED', preserveTargetAlert: true });
+        addLog('TARGET', `Auto-refresh stopped for tab ${tabId} because target was detected`);
+      }
+
+      sendResponse({
+        success: !!(presentation && presentation.success),
+        soundPlayed: !!nativeSound.success || !!(presentation && presentation.soundPlayed),
+        error: presentation && presentation.error
+      });
+    })();
     return true;
   }
 
