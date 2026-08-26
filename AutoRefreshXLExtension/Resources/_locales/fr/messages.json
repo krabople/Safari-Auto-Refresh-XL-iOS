@@ -1,1 +1,18 @@
-{"extensionName":{"message":"Auto Refresh XL"},"extensionShortName":{"message":"Auto Refresh XL"},"extensionDescription":{"message":"Actualisez automatiquement les pages Safari, surveillez les changements de texte et recevez des alertes visuelles et sonores."},"extensionActionTitle":{"message":"Auto Refresh XL"}}
+{
+  "extensionName": {
+    "message": "Auto Refresh XL",
+    "description": "Installed extension name"
+  },
+  "extensionShortName": {
+    "message": "Auto Refresh XL",
+    "description": "Short installed extension name"
+  },
+  "extensionDescription": {
+    "message": "Actualisez automatiquement les pages Safari, surveillez les changements de texte et recevez des alertes visuelles et sonores.",
+    "description": "Localized extension description"
+  },
+  "extensionActionTitle": {
+    "message": "Auto Refresh XL",
+    "description": "Extension toolbar title"
+  }
+}

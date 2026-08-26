@@ -1,1 +1,18 @@
-{"extensionName":{"message":"Auto Refresh XL"},"extensionShortName":{"message":"Auto Refresh XL"},"extensionDescription":{"message":"Safari-Seiten automatisch aktualisieren, Textänderungen überwachen und sichtbare sowie akustische Alarme erhalten."},"extensionActionTitle":{"message":"Auto Refresh XL"}}
+{
+  "extensionName": {
+    "message": "Auto Refresh XL",
+    "description": "Installed extension name"
+  },
+  "extensionShortName": {
+    "message": "Auto Refresh XL",
+    "description": "Short installed extension name"
+  },
+  "extensionDescription": {
+    "message": "Safari-Seiten automatisch aktualisieren, Textänderungen überwachen und sichtbare sowie akustische Alarme erhalten.",
+    "description": "Localized extension description"
+  },
+  "extensionActionTitle": {
+    "message": "Auto Refresh XL",
+    "description": "Extension toolbar title"
+  }
+}
