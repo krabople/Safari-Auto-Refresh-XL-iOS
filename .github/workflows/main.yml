@@ -124,6 +124,7 @@ jobs:
                    -sdk iphoneos \
                    -configuration Release \
                    -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                   DEVELOPMENT_TEAM="6YYA8L76Y8" \
                    CODE_SIGN_IDENTITY="Apple Distribution" \
                    CODE_SIGNING_REQUIRED=NO \
                    AD_HOC_CODE_SIGNING_ALLOWED=YES \
