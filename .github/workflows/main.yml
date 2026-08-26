@@ -33,12 +33,14 @@ jobs:
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_EXTENSION_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_EXTENSION_PROVISION_PROFILE_BASE64 }}
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY; do
+          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD BUILD_PROVISION_PROFILE_BASE64 BUILD_EXTENSION_PROVISION_PROFILE_BASE64 APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY; do
             if [ -z "${!name:-}" ]; then
               echo "Missing required GitHub Actions secret: $name" >&2
               exit 1
@@ -49,16 +51,22 @@ jobs:
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_EXTENSION_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_EXTENSION_PROVISION_PROFILE_BASE64 }}
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
         run: |
           set -euo pipefail
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
+          APP_PROFILE_PATH="$RUNNER_TEMP/app.mobileprovision"
+          EXTENSION_PROFILE_PATH="$RUNNER_TEMP/extension.mobileprovision"
           API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPSTORE_KEY_ID}.p8"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
 
           printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$APP_PROFILE_PATH"
+          printf '%s' "$BUILD_EXTENSION_PROVISION_PROFILE_BASE64" | base64 --decode > "$EXTENSION_PROFILE_PATH"
           printf '%s' "$APPSTORE_PRIVATE_KEY" > "$API_KEY_PATH"
           chmod 600 "$API_KEY_PATH"
 
@@ -74,8 +82,22 @@ jobs:
             exit 1
           fi
 
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+          for profile in "$APP_PROFILE_PATH" "$EXTENSION_PROFILE_PATH"; do
+            plist="$profile.plist"
+            security cms -D -i "$profile" > "$plist"
+            uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$plist")"
+            cp "$profile" "$PROFILES_DIR/$uuid.mobileprovision"
+          done
+
+          APP_PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$APP_PROFILE_PATH.plist")"
+          EXTENSION_PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$EXTENSION_PROFILE_PATH.plist")"
+
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           echo "API_KEY_PATH=$API_KEY_PATH" >> "$GITHUB_ENV"
+          echo "APP_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "EXTENSION_PROFILE_NAME=$EXTENSION_PROFILE_NAME" >> "$GITHUB_ENV"
 
       - name: Generate Xcode project
         run: |
@@ -99,7 +121,9 @@ jobs:
 
           PROJECT_FILE="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name project.pbxproj -print -quit)"
           sed -i '' "s/com\\.yourCompany\\.Safari-Auto-Refresh-and-Page-Monitor-XL/$APP_BUNDLE_ID/g" "$PROJECT_FILE"
-          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PROJECT_FILE"
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PROJECT_FILE"
+          perl -0pi -e 's#(PRODUCT_BUNDLE_IDENTIFIER = \Q$ENV{APP_BUNDLE_ID}\E;)#$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{APP_PROFILE_NAME}";#g' "$PROJECT_FILE"
+          perl -0pi -e 's#(PRODUCT_BUNDLE_IDENTIFIER = \Q$ENV{EXTENSION_BUNDLE_ID}\E;)#$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{EXTENSION_PROFILE_NAME}";#g' "$PROJECT_FILE"
 
           BUILD_NUMBER="$GITHUB_RUN_NUMBER"
           find "$GITHUB_WORKSPACE/GeneratedProject" -name Info.plist -type f -print0 | while IFS= read -r -d '' plist; do
@@ -131,12 +155,9 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/AutoRefreshXL.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$API_KEY_PATH" \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
 
       - name: Export App Store IPA
@@ -152,9 +173,15 @@ jobs:
           <dict>
             <key>destination</key><string>export</string>
             <key>method</key><string>app-store-connect</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
             <key>teamID</key><string>$TEAM_ID</string>
             <key>uploadSymbols</key><true/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$APP_BUNDLE_ID</key><string>$APP_PROFILE_NAME</string>
+              <key>$EXTENSION_BUNDLE_ID</key><string>$EXTENSION_PROFILE_NAME</string>
+            </dict>
           </dict>
           </plist>
           PLIST
@@ -163,11 +190,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/AutoRefreshXL.xcarchive" \
             -exportPath "$GITHUB_WORKSPACE/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$API_KEY_PATH" \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
 
           IPA_PATH="$(find "$GITHUB_WORKSPACE/export" -name '*.ipa' -print -quit)"
           test -n "$IPA_PATH"
