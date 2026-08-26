@@ -121,6 +121,7 @@ jobs:
 
           PROJECT_FILE="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name project.pbxproj -print -quit)"
           sed -i '' "s/com\\.yourCompany\\.Safari-Auto-Refresh-and-Page-Monitor-XL/$APP_BUNDLE_ID/g" "$PROJECT_FILE"
+          sed -i '' "s/com\\.yourCompany\\.Auto-Refresh-XL/$APP_BUNDLE_ID/g" "$PROJECT_FILE"
           sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PROJECT_FILE"
           perl -0pi -e 's#(PRODUCT_BUNDLE_IDENTIFIER = "?\Q$ENV{APP_BUNDLE_ID}\E"?;)#$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{APP_PROFILE_NAME}";#g' "$PROJECT_FILE"
           perl -0pi -e 's#(PRODUCT_BUNDLE_IDENTIFIER = "?\Q$ENV{EXTENSION_BUNDLE_ID}\E"?;)#$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{EXTENSION_PROFILE_NAME}";#g' "$PROJECT_FILE"
