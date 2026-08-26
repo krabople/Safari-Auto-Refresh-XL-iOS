@@ -118,14 +118,6 @@ jobs:
         
         echo "Selected Scheme: '$SCHEME'"
 
-        echo "=== 5. Compiling iOS Application ==="
-        KEY_ID="${{ secrets.APPSTORE_KEY_ID }}"
-        ISSUER_ID="${{ secrets.APPSTORE_ISSUER_ID }}"
-        PRIVATE_KEY="${{ secrets.APPSTORE_PRIVATE_KEY }}"
-
-        if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY" ]; then
-          echo "App Store Connect API key detected. Building & signing for App Store / TestFlight..."
-          KEY_DIR="$HOME/.appstoreconnect/private_keys"
         echo "=== 5. Compiling iOS Application with Apple Distribution Certificate ==="
         xcodebuild -project "$PROJ_NAME" \
                    -scheme "$SCHEME" \
@@ -137,7 +129,6 @@ jobs:
                    AD_HOC_CODE_SIGNING_ALLOWED=YES \
                    INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
                    build
-
         cd "$GITHUB_WORKSPACE"
 
         echo "=== 6. Locating Compiled .app Bundle ==="

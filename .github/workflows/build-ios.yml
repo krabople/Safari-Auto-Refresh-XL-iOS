@@ -118,33 +118,17 @@ jobs:
         
         echo "Selected Scheme: '$SCHEME'"
 
-        echo "=== 5. Compiling iOS Application ==="
-        KEY_ID="${{ secrets.APPSTORE_KEY_ID }}"
-        ISSUER_ID="${{ secrets.APPSTORE_ISSUER_ID }}"
-        PRIVATE_KEY="${{ secrets.APPSTORE_PRIVATE_KEY }}"
-
-        if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY" ]; then
-          echo "App Store Connect API key detected. Building & signing for App Store / TestFlight..."
-          KEY_DIR="$HOME/.appstoreconnect/private_keys"
-          mkdir -p "$KEY_DIR"
-          KEY_PATH="$KEY_DIR/AuthKey_${KEY_ID}.p8"
-          echo "$PRIVATE_KEY" > "$KEY_PATH"
-
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > "$GITHUB_WORKSPACE/exportOptions.plist"
-          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> "$GITHUB_WORKSPACE/exportOptions.plist"
-          echo '<plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>6YYA8L76Y8</string><key>destination</key><string>export</string><key>manageAppVersionAndBuildNumber</key><true/><key>signingStyle</key><string>automatic</string></dict></plist>' >> "$GITHUB_WORKSPACE/exportOptions.plist"
-
-          xcodebuild -project "$PROJ_NAME" \
-                     -scheme "$SCHEME" \
-                     -sdk iphoneos \
-                     -configuration Release \
-                     -derivedDataPath "$GITHUB_WORKSPACE/build" \
-                     CODE_SIGN_IDENTITY="Apple Distribution" \
-                     CODE_SIGNING_REQUIRED=NO \
-                     AD_HOC_CODE_SIGNING_ALLOWED=YES \
-                     INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
-                     build
-        fi
+        echo "=== 5. Compiling iOS Application with Apple Distribution Certificate ==="
+        xcodebuild -project "$PROJ_NAME" \
+                   -scheme "$SCHEME" \
+                   -sdk iphoneos \
+                   -configuration Release \
+                   -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                   CODE_SIGN_IDENTITY="Apple Distribution" \
+                   CODE_SIGNING_REQUIRED=NO \
+                   AD_HOC_CODE_SIGNING_ALLOWED=YES \
+                   INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
+                   build
 
         echo "=== 6. Locating Compiled .app Bundle ==="
         APP_PATH=$(find "$GITHUB_WORKSPACE/build" -name "*.app" -type d | grep -v "\.appex" | head -n 1)
