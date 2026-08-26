@@ -146,10 +146,11 @@ jobs:
         rm -rf ./Payload SafariAutoRefreshXL.ipa
         mkdir -p ./Payload
         cp -R "$APP_PATH" ./Payload/
+        TARGET_APP_DIR=$(find ./Payload -name "*.app" -type d | head -n 1)
         PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-        if [ -f "$PP_PATH" ]; then
-          cp "$PP_PATH" ./Payload/*.app/embedded.mobileprovision
-          echo "Successfully embedded mobileprovision profile into app bundle"
+        if [ -f "$PP_PATH" ] && [ -n "$TARGET_APP_DIR" ]; then
+          cp "$PP_PATH" "$TARGET_APP_DIR/embedded.mobileprovision"
+          echo "Successfully embedded mobileprovision profile into app bundle at $TARGET_APP_DIR/embedded.mobileprovision"
         fi
         zip -r SafariAutoRefreshXL.ipa Payload
 
