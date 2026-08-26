@@ -119,17 +119,15 @@ jobs:
         
         echo "Selected Scheme: '$SCHEME'"
 
-        echo "=== 5. Compiling iOS Application with Apple Distribution Certificate & Provisioning Profile ==="
+        echo "=== 5. Compiling iOS Application ==="
         xcodebuild -project "$PROJ_NAME" \
                    -scheme "$SCHEME" \
                    -sdk iphoneos \
                    -configuration Release \
                    -derivedDataPath "$GITHUB_WORKSPACE/build" \
-                   DEVELOPMENT_TEAM="6YYA8L76Y8" \
-                   CODE_SIGN_IDENTITY="Apple Distribution" \
-                   PROVISIONING_PROFILE_SPECIFIER="AutoRefreshXL_TestFlight" \
-                   CODE_SIGNING_REQUIRED=YES \
-                   AD_HOC_CODE_SIGNING_ALLOWED=NO \
+                   CODE_SIGN_IDENTITY="" \
+                   CODE_SIGNING_REQUIRED=NO \
+                   AD_HOC_CODE_SIGNING_ALLOWED=YES \
                    INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
                    build
 
