@@ -1,0 +1,40 @@
+name: Add TestFlight Beta Testers
+
+on:
+  workflow_dispatch:
+    inputs:
+      emails:
+        description: 'Comma separated list of tester emails'
+        required: true
+        default: 'nathanberger@hotmail.com, bergernathan@hotmail.com, nathanberger1980@googlemail.com'
+
+jobs:
+  add-testers:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Add Testers via App Store Connect API
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          TESTER_EMAILS: ${{ github.event.inputs.emails || 'nathanberger@hotmail.com, bergernathan@hotmail.com, nathanberger1980@googlemail.com' }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
+          echo "$PRIVATE_KEY" > "$KEY_PATH"
+
+          IFS=',' read -ra EMAILS <<< "$TESTER_EMAILS"
+          for email in "${EMAILS[@]}"; do
+            email=$(echo "$email" | xargs)
+            if [ -n "$email" ]; then
+              echo "Adding TestFlight tester: $email..."
+              fastlane pilot add_tester \
+                --email "$email" \
+                --api_key_path "$KEY_PATH" \
+                --key_id "$KEY_ID" \
+                --issuer_id "$ISSUER_ID" || true
+            fi
+          done
