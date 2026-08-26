@@ -147,6 +147,11 @@ jobs:
         rm -rf ./Payload SafariAutoRefreshXL.ipa
         mkdir -p ./Payload
         cp -R "$APP_PATH" ./Payload/
+        PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+        if [ -f "$PP_PATH" ]; then
+          cp "$PP_PATH" ./Payload/*.app/embedded.mobileprovision
+          echo "Successfully embedded mobileprovision profile into app bundle"
+        fi
         zip -r SafariAutoRefreshXL.ipa Payload
 
     - name: Upload IPA Artifact for Sideloadly
