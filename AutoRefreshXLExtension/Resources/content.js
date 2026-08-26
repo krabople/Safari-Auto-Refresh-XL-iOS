@@ -5,6 +5,7 @@
   let currentTabState = null;
   let overlayElement = null;
   let overlayShadow = null;
+  let overlayDismissed = false;
   let isDragging = false;
   let dragOffsetX = 0;
   let dragOffsetY = 0;
@@ -122,6 +123,10 @@
 
   function initContentFeatures() {
     if (!currentTabState) return;
+
+    // The background state belongs to the whole tab. Running the monitor in
+    // every iframe can produce duplicate/incorrect detections and stop the tab.
+    if (!isTopFrame) return;
 
     const needsSoundControl = currentTabState.monitorEnabled &&
       currentTabState.targetText &&
@@ -458,6 +463,11 @@
       const searchRoot = roots[index];
       if (!searchRoot.querySelectorAll) continue;
       searchRoot.querySelectorAll('*').forEach(element => {
+        if (element.id === 'auto-refresh-plus-widget-host' ||
+            element.id === 'arp-target-alert-banner' ||
+            element.closest('#auto-refresh-plus-widget-host, #arp-target-alert-banner')) {
+          return;
+        }
         if (element.shadowRoot && !roots.includes(element.shadowRoot)) {
           roots.push(element.shadowRoot);
         }
@@ -505,7 +515,7 @@
             }
             const parent = node.parentElement;
             if (!parent) return NodeFilter.FILTER_REJECT;
-            if (parent.closest('#arp-target-alert-banner') || parent.closest('#arp-floating-overlay-host') || parent.closest('.arp-exact-word-highlight')) {
+            if (parent.closest('#arp-target-alert-banner') || parent.closest('#auto-refresh-plus-widget-host') || parent.closest('.arp-exact-word-highlight')) {
               return NodeFilter.FILTER_REJECT;
             }
             const tag = parent.tagName.toLowerCase();
@@ -590,7 +600,8 @@
       let node;
       while ((node = walker.nextNode())) {
         regex.lastIndex = 0;
-        if (regex.test(node.nodeValue) && node.parentElement) {
+        if (regex.test(node.nodeValue) && node.parentElement &&
+            !node.parentElement.closest('#arp-target-alert-banner, #auto-refresh-plus-widget-host')) {
           return node.parentElement;
         }
       }
@@ -691,7 +702,7 @@
   }
 
   function renderFloatingOverlay() {
-    if (overlayElement) return;
+    if (overlayElement || overlayDismissed || !isTopFrame) return;
 
     overlayElement = document.createElement('div');
     overlayElement.id = 'auto-refresh-plus-widget-host';
@@ -866,6 +877,8 @@
       targetParent.appendChild(overlayElement);
     }
 
+    applySavedOverlayPosition();
+
     // Touch & Mouse Dragging for Mobile Safari
     const header = overlayShadow.querySelector('.arp-header');
     
@@ -878,15 +891,24 @@
 
     const moveDrag = (clientX, clientY) => {
       if (!isDragging) return;
-      const newLeft = clientX - dragOffsetX;
-      const newTop = clientY - dragOffsetY;
-      overlayElement.style.left = `${Math.max(0, newLeft)}px`;
-      overlayElement.style.top = `${Math.max(0, newTop)}px`;
+      const rect = overlayElement.getBoundingClientRect();
+      const maxLeft = Math.max(0, window.innerWidth - rect.width);
+      const maxTop = Math.max(0, window.innerHeight - rect.height);
+      const newLeft = Math.min(maxLeft, Math.max(0, clientX - dragOffsetX));
+      const newTop = Math.min(maxTop, Math.max(0, clientY - dragOffsetY));
+      overlayElement.style.left = `${newLeft}px`;
+      overlayElement.style.top = `${newTop}px`;
       overlayElement.style.right = 'auto';
     };
 
     const endDrag = () => {
+      if (!isDragging) return;
       isDragging = false;
+      const rect = overlayElement && overlayElement.getBoundingClientRect();
+      if (!rect) return;
+      const position = { left: Math.round(rect.left), top: Math.round(rect.top) };
+      if (currentTabState) currentTabState.overlayPosition = position;
+      chrome.runtime.sendMessage({ type: 'SET_OVERLAY_POSITION', position });
     };
 
     header.addEventListener('touchstart', (e) => {
@@ -907,7 +929,10 @@
     document.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
     document.addEventListener('mouseup', endDrag);
 
-    overlayShadow.querySelector('#arp-close-widget').addEventListener('click', removeOverlay);
+    overlayShadow.querySelector('#arp-close-widget').addEventListener('click', () => {
+      overlayDismissed = true;
+      removeOverlay();
+    });
     overlayShadow.querySelector('#arp-enable-sound-btn').addEventListener('click', toggleAlertAudio);
     overlayShadow.querySelector('#arp-stop-btn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ type: 'STOP_REFRESH' }, removeOverlay);
@@ -916,6 +941,9 @@
   }
 
   async function enableAlertAudio() {
+    soundAlertsEnabled = true;
+    if (currentTabState) currentTabState.soundEnabled = true;
+    chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: true });
     const context = getUnlockedAudioContext();
     if (!context) {
       audioUnlocked = false;
@@ -928,7 +956,6 @@
         await context.resume();
       }
       audioUnlocked = context.state === 'running';
-      soundAlertsEnabled = audioUnlocked;
       if (!audioUnlocked) {
         throw new Error('Safari did not unlock audio');
       }
@@ -944,7 +971,7 @@
   }
 
   async function toggleAlertAudio() {
-    if (audioUnlocked && soundAlertsEnabled) {
+    if (soundAlertsEnabled) {
       soundAlertsEnabled = false;
       if (currentTabState) currentTabState.soundEnabled = false;
       updateSoundEnableControl();
@@ -955,9 +982,6 @@
     soundAlertsEnabled = true;
     if (currentTabState) currentTabState.soundEnabled = true;
     await enableAlertAudio();
-    if (audioUnlocked) {
-      chrome.runtime.sendMessage({ type: 'SET_SOUND_ENABLED', enabled: true });
-    }
   }
 
   function updateSoundEnableControl(failureText = '') {
@@ -971,11 +995,25 @@
     }
 
     button.style.display = 'block';
-    const isEnabled = audioUnlocked && soundAlertsEnabled;
+    const isEnabled = soundAlertsEnabled;
     button.classList.toggle('is-enabled', isEnabled);
     button.textContent = isEnabled
       ? '🔇 Disable Alert Sound'
       : (failureText || '🔊 Enable Alert Sound');
+  }
+
+  function applySavedOverlayPosition() {
+    if (!overlayElement || !currentTabState || !currentTabState.overlayPosition) return;
+    const savedLeft = Number(currentTabState.overlayPosition.left);
+    const savedTop = Number(currentTabState.overlayPosition.top);
+    if (!Number.isFinite(savedLeft) || !Number.isFinite(savedTop)) return;
+
+    const rect = overlayElement.getBoundingClientRect();
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    overlayElement.style.left = `${Math.min(maxLeft, Math.max(0, savedLeft))}px`;
+    overlayElement.style.top = `${Math.min(maxTop, Math.max(0, savedTop))}px`;
+    overlayElement.style.right = 'auto';
   }
 
   function updateOverlayCountdown(remainingSeconds, refreshCount, maxRefreshes) {

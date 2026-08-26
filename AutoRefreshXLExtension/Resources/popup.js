@@ -213,7 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       actionStop: actStop.checked,
       actionSound: actSound.checked,
       actionHighlight: actHighlight.checked,
-      actionScroll: actScroll.checked
+      actionScroll: actScroll.checked,
+      actionFocus: actFocus ? actFocus.checked : true,
+      soundEnabled: activeState ? activeState.soundEnabled !== false : true
     };
   }
 
@@ -274,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         condition: conditionType ? conditionType.value : 'appears',
         actionStop: actStop ? actStop.checked : true,
         actionSound: actSound ? actSound.checked : true,
-        soundEnabled: true,
+        soundEnabled: activeState ? activeState.soundEnabled !== false : true,
         actionHighlight: actHighlight ? actHighlight.checked : true,
         actionScroll: actScroll ? actScroll.checked : true,
         actionFocus: actFocus ? actFocus.checked : false

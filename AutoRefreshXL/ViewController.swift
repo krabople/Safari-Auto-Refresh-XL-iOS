@@ -231,14 +231,14 @@ final class ViewController: UIViewController {
             GuideSection(title: "Stop on interaction", body: "Stops refreshing when you interact with the monitored webpage. Use this when you want a tap, click, key press, or other page interaction to end the active refresh session.")]),
         FeatureGuide(icon: "rectangle.inset.filled", title: "On-page overlay", summary: "Countdown, monitored term, and controls", sections: [
             GuideSection(title: "What it shows", body: "The draggable overlay shows countdown, refresh count, fixed or random mode, monitored term, Stop Refresh, and the sound toggle when monitoring uses sound."),
-            GuideSection(title: "Moving and hiding", body: "Drag its header. Closing the widget hides it; use Stop Refresh to end the process."),
+            GuideSection(title: "Moving and hiding", body: "Drag its header. Its position is retained across refreshes in the same tab. Closing the widget hides it until the next page load; use Stop Refresh to end the process."),
             GuideSection(title: "Compatibility", body: "It cannot appear on Safari internal pages, Settings, some document viewers, or websites without extension access.")]),
         FeatureGuide(icon: "text.magnifyingglass", title: "Content monitoring", summary: "Text, regex, and XPath matching", sections: [
             GuideSection(title: "Plain Text", body: "Case-insensitive text matching. Entering text into an empty field turns monitoring on; clearing it turns monitoring off. You can manually switch it off while keeping the text."),
             GuideSection(title: "Regular Expression", body: "Uses a case-insensitive JavaScript regular expression. Invalid expressions cannot match, so test complex expressions carefully."),
             GuideSection(title: "XPath", body: "Finds an element using its page structure. XPath rules may break when a site redesigns its markup."),
             GuideSection(title: "Appears or disappears", body: "Appears triggers when a match exists; Disappears triggers when it does not. Checks start after the first countdown."),
-            GuideSection(title: "Dynamic sites", body: "Fresh server HTML is checked. Very late JavaScript content, inaccessible frames, images, and canvas text may not be detectable.")]),
+            GuideSection(title: "Dynamic sites", body: "The rendered page is checked immediately after refresh and watched for later changes. Inaccessible frames, images, canvas text, and closed components may not be detectable.")]),
         FeatureGuide(icon: "speaker.wave.3.fill", title: "Sound alerts", summary: "Safari-safe audible target alerts", sections: [
             GuideSection(title: "Enabling sound", body: "Safari requires a webpage tap before it can play sound. Tap Enable Alert Sound on the overlay; the confirmation sound verifies it and the control changes to Disable Alert Sound."),
             GuideSection(title: "Other tabs", body: "Alerts are routed to the tab you are viewing. If that webpage has not received a tap, Safari may block audio and the banner offers an Enable Sound button."),

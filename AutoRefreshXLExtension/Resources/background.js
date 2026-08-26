@@ -3,6 +3,7 @@ const extensionLogs = [];
 let targetTabId = null;
 let tabStatesLoaded = false;
 const statesStartedDuringRestore = new Set();
+const refreshesInProgress = new Set();
 
 function addLog(category, message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -75,8 +76,17 @@ const DEFAULT_TAB_STATE = {
   soundEnabled: true,
   actionHighlight: true,
   actionScroll: true,
-  actionFocus: true
+  actionFocus: true,
+  overlayPosition: null
 };
+
+function normalizeTabState(state) {
+  const normalized = Object.assign({}, DEFAULT_TAB_STATE, state || {});
+  // This flag belonged to an earlier worker instance and must never prevent a
+  // newly-created Safari worker from resuming the timer after navigation.
+  delete normalized.isRefreshing;
+  return normalized;
+}
 
 // Initialize background worker
 chrome.runtime.onInstalled.addListener(async () => {
@@ -108,7 +118,7 @@ const tabStatesReady = chrome.storage.local.get(['tabStates']).then((result) => 
   if (result.tabStates) {
     for (const [tabId, state] of Object.entries(result.tabStates)) {
       if (!statesStartedDuringRestore.has(String(tabId))) {
-        activeTabStates[tabId] = state;
+        activeTabStates[tabId] = normalizeTabState(state);
       }
     }
   }
@@ -166,10 +176,23 @@ setInterval(async () => {
 }, 1000);
 
 async function runRefreshCycle(tabId, state) {
-  if (!state || !state.enabled || state.isRefreshing) return;
-  state.isRefreshing = true;
+  if (!state || !state.enabled || refreshesInProgress.has(tabId)) return;
+  refreshesInProgress.add(tabId);
 
   state.refreshCount += 1;
+
+  const reachedLimit = state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes;
+  if (reachedLimit) {
+    state.enabled = false;
+    state.nextRefreshTime = 0;
+    await saveTabStates();
+    if (chrome.alarms) await chrome.alarms.clear(`refresh_tab_${tabId}`);
+  } else {
+    // Commit the next deadline before navigation. Mobile Safari can suspend
+    // this worker as soon as reload begins; the restored worker/alarm can then
+    // continue the cycle even if execution never returns from tabs.reload().
+    await scheduleNextRefresh(tabId);
+  }
 
   // Reload first, then let the content script inspect the document Safari
   // actually rendered. A separately fetched copy can differ because of login
@@ -180,22 +203,13 @@ async function runRefreshCycle(tabId, state) {
     addLog('REFRESH', `Reloaded tab ${tabId} (Count: ${state.refreshCount})`, 'success');
   } catch (err) {
     addLog('REFRESH', `Failed to reload tab ${tabId}: ${err.message}`, 'error');
+  } finally {
+    refreshesInProgress.delete(tabId);
   }
 
-  if (state.maxRefreshes > 0 && state.refreshCount >= state.maxRefreshes) {
-    state.enabled = false;
-    state.isRefreshing = false;
-    saveTabStates();
-    if (chrome.alarms) chrome.alarms.clear(`refresh_tab_${tabId}`);
-
+  if (reachedLimit) {
     sendToTab(tabId, { type: 'REFRESH_STOPPED', state: state });
     updateActiveTabBadge();
-  } else if (state.enabled) {
-    state.isRefreshing = false;
-    await scheduleNextRefresh(tabId);
-  } else {
-    state.isRefreshing = false;
-    saveTabStates();
   }
 }
 
@@ -316,7 +330,11 @@ if (chrome.tabs.onReplaced) {
 }
 
 function saveTabStates() {
-  return chrome.storage.local.set({ tabStates: activeTabStates });
+  const persistedStates = {};
+  for (const [tabId, state] of Object.entries(activeTabStates)) {
+    persistedStates[tabId] = normalizeTabState(state);
+  }
+  return chrome.storage.local.set({ tabStates: persistedStates });
 }
 
 async function sendToTab(tabId, message) {
@@ -425,7 +443,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const tabId = request.tabId || senderTabId || targetTabId;
     if (tabId && activeTabStates[tabId]) {
       activeTabStates[tabId].enabled = false;
-      activeTabStates[tabId].isRefreshing = false;
       saveTabStates();
     }
     if (chrome.alarms && tabId) chrome.alarms.clear(`refresh_tab_${tabId}`);
@@ -479,6 +496,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       saveTabStates();
     }
     sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.type === 'SET_OVERLAY_POSITION') {
+    const tabId = request.tabId || senderTabId || targetTabId;
+    const left = Number(request.position && request.position.left);
+    const top = Number(request.position && request.position.top);
+    if (tabId && activeTabStates[tabId] && Number.isFinite(left) && Number.isFinite(top)) {
+      activeTabStates[tabId].overlayPosition = {
+        left: Math.max(0, left),
+        top: Math.max(0, top)
+      };
+      saveTabStates();
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, error: 'Invalid overlay position' });
+    }
     return true;
   }
 
