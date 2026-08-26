@@ -141,6 +141,7 @@ jobs:
 
         echo "Found compiled iOS app at: $APP_PATH"
 
+        cd "$GITHUB_WORKSPACE"
         echo "=== 7. Packaging IPA for TestFlight ==="
         rm -rf ./Payload SafariAutoRefreshXL.ipa
         mkdir -p ./Payload
