@@ -156,7 +156,7 @@ jobs:
         fi
 
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-        CERT_HASH=$(security find-identity -v -p codesigning $KEYCHAIN_PATH 2>/dev/null | grep "Apple Distribution" | head -n 1 | awk '{print $2}')
+        CERT_HASH=$(security find-certificate -a -c "Apple Distribution" -Z "$KEYCHAIN_PATH" 2>/dev/null | grep "SHA-1 hash:" | head -n 1 | awk '{print $3}')
         if [ -z "$CERT_HASH" ]; then
           CERT_HASH=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -n 1 | awk '{print $2}')
         fi
