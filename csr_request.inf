@@ -1,0 +1,10 @@
+[NewRequest]
+Subject = "CN=AutoRefreshXL, O=Developer, C=US"
+KeyLength = 2048
+KeySpec = 1
+KeyUsage = 0xA0
+MachineKeySet = False
+ProviderName = "Microsoft Enhanced Cryptographic Provider v1.0"
+ProviderType = 1
+RequestType = PKCS10
+Exportable = TRUE
