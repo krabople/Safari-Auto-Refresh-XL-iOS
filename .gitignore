@@ -1,0 +1,11 @@
+# Apple signing credentials and generated release artifacts
+*.p12
+*.pfx
+*.mobileprovision
+*.cer
+*.certSigningRequest
+*.ipa
+GeneratedProject/
+build/
+export/
+Payload/
