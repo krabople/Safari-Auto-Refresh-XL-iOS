@@ -79,9 +79,10 @@ jobs:
           echo "Successfully injected native SafariWebExtensionHandler.swift at $HANDLER_PATH"
         fi
 
-        echo "=== 2c. Updating Bundle Identifiers & Display Name for App Store Connect ==="
+        echo "=== 2c. Updating Bundle Identifiers & Manual Signing for App Store Connect ==="
         find "$GITHUB_WORKSPACE/GeneratedProject" -name "project.pbxproj" -type f | while read -r pbx; do
           sed -i '' 's/com\.yourCompany\.Safari-Auto-Refresh-and-Page-Monitor-XL/com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8/g' "$pbx"
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$pbx"
         done
 
         find "$GITHUB_WORKSPACE/GeneratedProject" -name "Info.plist" -type f -print0 | while IFS= read -r -d '' PLIST_PATH; do
