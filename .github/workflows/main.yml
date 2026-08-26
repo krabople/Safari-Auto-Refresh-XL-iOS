@@ -37,8 +37,8 @@ jobs:
         security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
         security unlock-keychain -p "" $KEYCHAIN_PATH
 
-        security import $CERT_PATH -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -T /usr/bin/codesign
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" $KEYCHAIN_PATH
+        security import $CERT_PATH -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -A
+        security list-keychains -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '"')
 
         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
         cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
