@@ -133,6 +133,8 @@ jobs:
               /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist"
+            /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$plist"
           done
 
           XCODE_PROJECT="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name '*.xcodeproj' -print -quit)"
