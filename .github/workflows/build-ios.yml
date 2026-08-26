@@ -152,6 +152,22 @@ jobs:
           cp "$PP_PATH" "$TARGET_APP_DIR/embedded.mobileprovision"
           echo "Successfully embedded mobileprovision profile into app bundle at $TARGET_APP_DIR/embedded.mobileprovision"
         fi
+
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+        CERT_NAME=$(security find-identity -v -p codesigning $KEYCHAIN_PATH 2>/dev/null | grep "Apple Distribution" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+        if [ -z "$CERT_NAME" ]; then
+          CERT_NAME=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+        fi
+
+        if [ -n "$CERT_NAME" ]; then
+          echo "Re-signing app and extensions with official Apple Distribution identity: '$CERT_NAME'..."
+          find "$TARGET_APP_DIR/PlugIns" -name "*.appex" -type d 2>/dev/null | while read -r appex; do
+            codesign --force --sign "$CERT_NAME" --timestamp "$appex"
+          done
+          codesign --force --sign "$CERT_NAME" --timestamp "$TARGET_APP_DIR"
+          echo "Successfully code-signed application with Apple Distribution certificate!"
+        fi
+
         zip -r SafariAutoRefreshXL.ipa Payload
 
     - name: Upload IPA Artifact for Sideloadly
