@@ -33,6 +33,7 @@ jobs:
               echo "Adding TestFlight tester: $email..."
               fastlane pilot add_tester \
                 --email "$email" \
+                --app_identifier "com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8" \
                 --api_key_path "$KEY_PATH" \
                 --key_id "$KEY_ID" \
                 --issuer_id "$ISSUER_ID" || true
