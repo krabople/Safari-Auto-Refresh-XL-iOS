@@ -79,7 +79,7 @@ jobs:
 
       - name: Generate Xcode project
         run: |
-          set -euo pipefail
+          set -eu
           RESOURCES_DIR="$GITHUB_WORKSPACE/AutoRefreshXLExtension/Resources"
           test -f "$RESOURCES_DIR/manifest.json"
           rm -rf "$GITHUB_WORKSPACE/GeneratedProject"
@@ -88,16 +88,16 @@ jobs:
             --swift --ios-only --no-open --no-prompt --force \
             --project-location "$GITHUB_WORKSPACE/GeneratedProject"
 
-          APP_VIEW_CONTROLLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*/ViewController.swift' -not -path '*Extension*' | head -n 1)"
+          APP_VIEW_CONTROLLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*/ViewController.swift' -not -path '*Extension*' -print -quit)"
           APP_SOURCE_DIR="$(dirname "$APP_VIEW_CONTROLLER")"
           cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$APP_SOURCE_DIR/ViewController.swift"
           cp "$GITHUB_WORKSPACE/AutoRefreshXL/AppDelegate.swift" "$APP_SOURCE_DIR/AppDelegate.swift"
           cp "$GITHUB_WORKSPACE/AutoRefreshXL/SceneDelegate.swift" "$APP_SOURCE_DIR/SceneDelegate.swift"
 
-          EXTENSION_HANDLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*Extension*/SafariWebExtensionHandler.swift' | head -n 1)"
+          EXTENSION_HANDLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*Extension*/SafariWebExtensionHandler.swift' -print -quit)"
           cp "$GITHUB_WORKSPACE/AutoRefreshXLExtension/SafariWebExtensionHandler.swift" "$EXTENSION_HANDLER"
 
-          PROJECT_FILE="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name project.pbxproj | head -n 1)"
+          PROJECT_FILE="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name project.pbxproj -print -quit)"
           sed -i '' "s/com\\.yourCompany\\.Safari-Auto-Refresh-and-Page-Monitor-XL/$APP_BUNDLE_ID/g" "$PROJECT_FILE"
           sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PROJECT_FILE"
 
@@ -109,7 +109,7 @@ jobs:
               /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist"
           done
 
-          XCODE_PROJECT="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name '*.xcodeproj' | head -n 1)"
+          XCODE_PROJECT="$(find "$GITHUB_WORKSPACE/GeneratedProject" -name '*.xcodeproj' -print -quit)"
           SCHEME="$(xcodebuild -list -project "$XCODE_PROJECT" | awk '/Schemes:/{found=1; next} found && /\\(iOS\\)/{sub(/^[[:space:]]+/, ""); print; exit}')"
           test -n "$SCHEME"
           echo "XCODE_PROJECT=$XCODE_PROJECT" >> "$GITHUB_ENV"
@@ -165,7 +165,7 @@ jobs:
             -authenticationKeyID "$APPSTORE_KEY_ID" \
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
 
-          IPA_PATH="$(find "$GITHUB_WORKSPACE/export" -name '*.ipa' | head -n 1)"
+          IPA_PATH="$(find "$GITHUB_WORKSPACE/export" -name '*.ipa' -print -quit)"
           test -n "$IPA_PATH"
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
