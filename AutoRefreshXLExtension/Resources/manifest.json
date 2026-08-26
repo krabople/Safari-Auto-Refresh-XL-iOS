@@ -3,7 +3,7 @@
   "name": "Safari Auto Refresh and Page Monitor XL",
   "short_name": "Safari Auto Refresh XL",
   "version": "1.1.1",
-  "description": "Auto refresh extension & page monitor for iOS Safari. Auto reload pages with custom/random intervals, target text detection & sound alerts.",
+  "description": "Automatically refresh Safari pages with custom intervals, text detection, and sound alerts.",
   "permissions": [
     "alarms",
     "storage",
