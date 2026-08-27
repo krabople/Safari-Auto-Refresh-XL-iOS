@@ -374,11 +374,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="inline-rule-row">
         <div>
           <div class="inline-rule-url">${escapeRuleText(rule.exactUrl || rule.pattern)}</div>
-          <div class="inline-rule-meta">${rule.urlMatch === 'exact' || rule.exactUrl ? 'Exact page' : 'URL pattern'} · ${Number(rule.settings && rule.settings.interval) || 10}s</div>
+          <div class="inline-rule-meta">${rule.urlMatch === 'exact' || rule.exactUrl ? t('Exact page') : t('URL pattern')} · ${Number(rule.settings && rule.settings.interval) || 10}s</div>
         </div>
         <div class="inline-rule-actions">
-          <button type="button" class="rule-action-btn rule-action-edit" data-edit-rule="${index}">Edit</button>
-          <button type="button" class="rule-action-btn rule-action-delete" data-delete-rule="${index}">Delete</button>
+          <button type="button" class="rule-action-btn rule-action-edit" data-edit-rule="${index}">${t('Edit')}</button>
+          <button type="button" class="rule-action-btn rule-action-delete" data-delete-rule="${index}">${t('Delete')}</button>
         </div>
       </div>
     `).join('');

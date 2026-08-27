@@ -379,7 +379,7 @@
         font-weight: 800;
         font-size: 13px;
         cursor: pointer;
-      ">Dismiss Alert</button>
+      ">${ARXL_I18N.t('Dismiss Alert')}</button>
     `;
 
     document.body.appendChild(banner);
