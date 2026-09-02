@@ -1,0 +1,3 @@
+• Corrigidos os alertas repetidos após o fim do monitoramento de palavras-chave.
+• Traduções e rótulos dos intervalos de atualização aprimorados.
+• Ícone e identidade visual no app atualizados.

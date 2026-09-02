@@ -1,0 +1,3 @@
+• Corregidas las alertas repetidas después de detener la monitorización de palabras clave.
+• Mejoradas las traducciones y las etiquetas de los intervalos de recarga.
+• Actualizados el icono y la imagen de marca dentro de la app.

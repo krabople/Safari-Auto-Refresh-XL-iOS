@@ -1,0 +1,3 @@
+• Wiederholte Stichwortwarnungen nach dem Beenden der Überwachung wurden behoben.
+• Übersetzungen und Beschriftungen der Aktualisierungsintervalle wurden verbessert.
+• App-Symbol und Darstellung in der App wurden aktualisiert.

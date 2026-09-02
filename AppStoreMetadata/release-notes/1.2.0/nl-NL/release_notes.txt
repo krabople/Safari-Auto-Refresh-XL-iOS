@@ -1,0 +1,3 @@
+• Herhaalde trefwoordmeldingen na het stoppen van de controle zijn opgelost.
+• Vertalingen en labels voor verversingsintervallen zijn verbeterd.
+• Het appicoon en de vormgeving in de app zijn bijgewerkt.

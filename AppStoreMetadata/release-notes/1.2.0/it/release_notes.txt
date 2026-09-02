@@ -1,0 +1,3 @@
+• Risolti gli avvisi ripetuti dopo l’interruzione del monitoraggio delle parole chiave.
+• Migliorate le traduzioni e le etichette degli intervalli di aggiornamento.
+• Aggiornate l’icona e l’identità visiva nell’app.

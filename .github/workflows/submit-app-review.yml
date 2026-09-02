@@ -75,9 +75,9 @@ jobs:
             --app_version "$APP_VERSION" \
             --build_number "$BUILD_NUMBER" \
             --platform ios \
+            --metadata_path "$GITHUB_WORKSPACE/AppStoreMetadata/release-notes/$APP_VERSION" \
             --skip_binary_upload true \
             --skip_screenshots true \
-            --skip_metadata true \
             --submit_for_review true \
             --force true \
             --run_precheck_before_submit false
