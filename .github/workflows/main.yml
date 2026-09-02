@@ -131,6 +131,37 @@ jobs:
           done < <(find "$APP_ICON_SET" -name '*.png' -type f -print0)
           test "$APP_ICON_COUNT" -gt 0
 
+          # The native app header is separate from the Home Screen icon.
+          # Add the same approved artwork as a named image set so the header
+          # can display it without relying on access to the special AppIcon set.
+          HEADER_LOGO_SET="$(dirname "$APP_ICON_SET")/HeaderLogo.imageset"
+          mkdir -p "$HEADER_LOGO_SET"
+          cp "$APP_ICON_SOURCE" "$HEADER_LOGO_SET/HeaderLogo.png"
+          cat > "$HEADER_LOGO_SET/Contents.json" <<'JSON'
+          {
+            "images" : [
+              {
+                "filename" : "HeaderLogo.png",
+                "idiom" : "universal",
+                "scale" : "1x"
+              },
+              {
+                "idiom" : "universal",
+                "scale" : "2x"
+              },
+              {
+                "idiom" : "universal",
+                "scale" : "3x"
+              }
+            ],
+            "info" : {
+              "author" : "xcode",
+              "version" : 1
+            }
+          }
+          JSON
+          test -f "$HEADER_LOGO_SET/HeaderLogo.png"
+
           APP_VIEW_CONTROLLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*/ViewController.swift' -not -path '*Extension*' -print -quit)"
           APP_SOURCE_DIR="$(dirname "$APP_VIEW_CONTROLLER")"
           cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$APP_SOURCE_DIR/ViewController.swift"

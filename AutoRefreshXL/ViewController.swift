@@ -1026,6 +1026,25 @@ private enum AppTheme {
 
 private final class AppLogoView: UIView {
     override func draw(_ rect: CGRect) {
+        if let image = UIImage(named: "HeaderLogo") {
+            let side = min(rect.width, rect.height)
+            let imageRect = CGRect(
+                x: rect.midX - side / 2,
+                y: rect.midY - side / 2,
+                width: side,
+                height: side
+            )
+            let clippingPath = UIBezierPath(
+                roundedRect: imageRect,
+                cornerRadius: side * 0.22
+            )
+            clippingPath.addClip()
+            image.draw(in: imageRect)
+            return
+        }
+
+        // Keep a lightweight fallback so the header never appears blank if an
+        // asset catalogue is unavailable in a development build.
         guard let context = UIGraphicsGetCurrentContext() else { return }
         context.setFillColor(AppTheme.card.cgColor); context.fillEllipse(in: rect.insetBy(dx: 1, dy: 1))
         context.setStrokeColor(AppTheme.cyan.cgColor); context.setLineWidth(max(5, rect.width * 0.13))
