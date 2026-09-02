@@ -1,0 +1,83 @@
+name: Submit iOS build for App Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: App Store version to submit
+        required: true
+        default: 1.2.0
+      build_number:
+        description: Processed App Store Connect build number
+        required: true
+        default: '125'
+      confirmation:
+        description: Type SUBMIT to authorize the App Review submission
+        required: true
+
+concurrency:
+  group: app-review-submission
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      APP_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8
+      APP_VERSION: ${{ inputs.app_version }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate explicit submission authorization
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = 'SUBMIT'
+          for name in APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required secret: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Create temporary App Store Connect API key
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          API_KEY_PATH="$RUNNER_TEMP/app-store-connect-api-key.json"
+          ruby -rjson -e 'File.write(ARGV.fetch(0), JSON.generate({"key_id" => ENV.fetch("APPSTORE_KEY_ID"), "issuer_id" => ENV.fetch("APPSTORE_ISSUER_ID"), "key" => ENV.fetch("APPSTORE_PRIVATE_KEY"), "duration" => 1200, "in_house" => false}))' "$API_KEY_PATH"
+          chmod 600 "$API_KEY_PATH"
+          echo "API_KEY_PATH=$API_KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Select build and submit for App Review
+        run: |
+          set -euo pipefail
+          DELIVER_WORKDIR="$RUNNER_TEMP/deliver"
+          mkdir -p "$DELIVER_WORKDIR/fastlane/metadata"
+          cd "$DELIVER_WORKDIR"
+          fastlane deliver \
+            --api_key_path "$API_KEY_PATH" \
+            --app_identifier "$APP_BUNDLE_ID" \
+            --app_version "$APP_VERSION" \
+            --build_number "$BUILD_NUMBER" \
+            --platform ios \
+            --skip_binary_upload true \
+            --skip_screenshots true \
+            --skip_metadata true \
+            --submit_for_review true \
+            --force true \
+            --run_precheck_before_submit false
