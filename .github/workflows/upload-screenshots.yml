@@ -1,0 +1,87 @@
+name: Upload localized App Store screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: Editable App Store version
+        required: true
+        default: 1.2.0
+      screenshot_release_tag:
+        description: Draft GitHub release containing screenshots-1.2.0.zip
+        required: true
+        default: appstore-screenshots-1.2.0
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      APP_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8
+      APP_VERSION: ${{ inputs.app_version }}
+      SCREENSHOT_RELEASE_TAG: ${{ inputs.screenshot_release_tag }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate App Store Connect credentials
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required secret: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Download and validate screenshot bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$SCREENSHOT_RELEASE_TAG" \
+            --pattern 'screenshots-1.2.0.zip' \
+            --dir "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP/screenshots-1.2.0.zip" -d "$RUNNER_TEMP/app-store-media"
+          SCREENSHOTS_PATH="$RUNNER_TEMP/app-store-media/screenshots"
+          test -d "$SCREENSHOTS_PATH"
+          test "$(find "$SCREENSHOTS_PATH" -type f -name '*.png' | wc -l | tr -d ' ')" = '120'
+          test "$(find "$SCREENSHOTS_PATH" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = '12'
+          echo "SCREENSHOTS_PATH=$SCREENSHOTS_PATH" >> "$GITHUB_ENV"
+
+      - name: Create temporary API key configuration
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          API_KEY_PATH="$RUNNER_TEMP/app-store-connect-api-key.json"
+          ruby -rjson -e 'File.write(ARGV.fetch(0), JSON.generate({"key_id" => ENV.fetch("APPSTORE_KEY_ID"), "issuer_id" => ENV.fetch("APPSTORE_ISSUER_ID"), "key" => ENV.fetch("APPSTORE_PRIVATE_KEY"), "duration" => 1200, "in_house" => false}))' "$API_KEY_PATH"
+          chmod 600 "$API_KEY_PATH"
+          echo "API_KEY_PATH=$API_KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Replace localized screenshots on the draft version
+        run: |
+          set -euo pipefail
+          fastlane deliver \
+            --api_key_path "$API_KEY_PATH" \
+            --app_identifier "$APP_BUNDLE_ID" \
+            --app_version "$APP_VERSION" \
+            --platform ios \
+            --screenshots_path "$SCREENSHOTS_PATH" \
+            --skip_metadata true \
+            --skip_binary_upload true \
+            --skip_app_version_update true \
+            --overwrite_screenshots true \
+            --force true \
+            --run_precheck_before_submit false \
+            --screenshot_processing_timeout 3600
