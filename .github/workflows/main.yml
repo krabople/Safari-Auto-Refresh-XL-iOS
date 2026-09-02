@@ -19,6 +19,7 @@ jobs:
       TEAM_ID: 6YYA8L76Y8
       APP_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8
       EXTENSION_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8.Extension
+      MARKETING_VERSION: 1.2.0
 
     steps:
       - name: Check out repository
@@ -135,6 +136,8 @@ jobs:
               /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleName Auto Refresh XL" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleName string Auto Refresh XL" "$plist"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist"
             /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$plist" 2>/dev/null || \
@@ -167,8 +170,10 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            MARKETING_VERSION="$MARKETING_VERSION" \
             INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
-            INFOPLIST_KEY_CFBundleName="Auto Refresh XL"
+            INFOPLIST_KEY_CFBundleName="Auto Refresh XL" \
+            INFOPLIST_KEY_CFBundleShortVersionString="$MARKETING_VERSION"
 
       - name: Export App Store IPA
         env:
