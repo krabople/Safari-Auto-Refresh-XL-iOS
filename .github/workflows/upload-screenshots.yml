@@ -13,7 +13,10 @@ on:
         default: appstore-screenshots-1.2.0
 
 permissions:
-  contents: read
+  # GitHub requires write-level release access for a workflow token to read
+  # assets attached to a non-public draft release. Restore this to read after
+  # the one-off screenshot upload finishes.
+  contents: write
 
 jobs:
   screenshots:
