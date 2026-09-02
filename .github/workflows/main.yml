@@ -48,6 +48,9 @@ jobs:
             fi
           done
 
+      - name: Run extension regression tests
+        run: node tests/regression.test.mjs
+
       - name: Install signing credentials
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}

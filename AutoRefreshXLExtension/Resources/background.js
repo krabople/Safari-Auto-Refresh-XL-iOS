@@ -77,6 +77,7 @@ const DEFAULT_TAB_STATE = {
   actionHighlight: true,
   actionScroll: true,
   actionFocus: true,
+  monitoringSessionComplete: false,
   overlayPosition: null
 };
 
@@ -85,6 +86,15 @@ function normalizeTabState(state) {
   // This flag belonged to an earlier worker instance and must never prevent a
   // newly-created Safari worker from resuming the timer after navigation.
   delete normalized.isRefreshing;
+
+  // Preserve compatibility with sessions completed by an earlier build. A
+  // pending detection on a stopped, stop-on-match session means the target was
+  // already reported; retain its settings and pending page actions, but do not
+  // re-arm monitoring when the updated content script is injected.
+  if (state && !Object.prototype.hasOwnProperty.call(state, 'monitoringSessionComplete') &&
+      state.enabled === false && state.actionStop !== false && state.pendingDetection) {
+    normalized.monitoringSessionComplete = true;
+  }
   return normalized;
 }
 
@@ -263,7 +273,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         if (matches && (!activeTabStates[tabId] || !activeTabStates[tabId].enabled)) {
           const newState = Object.assign({}, DEFAULT_TAB_STATE, rule.settings || {}, {
             enabled: true,
-            refreshCount: 0
+            refreshCount: 0,
+            monitoringSessionComplete: false
           });
           activeTabStates[tabId] = newState;
           saveTabStates();
@@ -402,6 +413,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         enabled: true,
         nextRefreshTime: Date.now() + (request.state.interval || 10) * 1000,
         refreshCount: request.state.refreshCount || 0,
+        monitoringSessionComplete: false,
         startedAt: Date.now(),
         sourceUrl: (tab && tab.url) || request.state.sourceUrl || ''
       });
@@ -555,6 +567,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const state = tabId ? activeTabStates[tabId] : null;
     const targetTxt = (state && state.targetText) ? state.targetText : (request.targetText || 'Keyword');
 
+    // A stopped detection remains configurable for the next Start press, but
+    // it is no longer an active monitoring session. Ignore late messages from
+    // the old document and from pages restored after navigation.
+    if (state && state.monitoringSessionComplete === true) {
+      sendResponse({ success: true, ignored: true });
+      return true;
+    }
+
     addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
     const presentOnActiveTab = async (playWebSound) => {
@@ -595,19 +615,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         targetText: targetTxt,
         matchType: state.matchType || 'text'
       };
-      saveTabStates();
       if (state.actionStop) {
         state.enabled = false;
-        saveTabStates();
+        state.monitoringSessionComplete = true;
+        state.nextRefreshTime = 0;
         updateActiveTabBadge();
         if (chrome.alarms && tabId) {
           chrome.alarms.clear(`refresh_tab_${tabId}`);
         }
       }
-
     }
 
+    // Persist the completed-session marker before presenting the alert. By the
+    // time the user can manually reload, a new content script must see the
+    // stopped state rather than mistaking it for a pending final-cycle check.
+    const persistedDetectionState = state
+      ? saveTabStates().catch((error) => {
+          addLog('SYSTEM', `Could not persist detected target state: ${error.message}`, 'error');
+        })
+      : Promise.resolve();
+
     (async () => {
+      await persistedDetectionState;
       const shouldPlaySound = (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false);
       const nativeSound = shouldPlaySound
         ? await playNativeAlertSound()

@@ -67,8 +67,7 @@
 
     if (currentTabState.enabled) {
       initContentFeatures();
-    } else if (currentTabState.monitorEnabled && currentTabState.targetText &&
-               Number(currentTabState.refreshCount || 0) > 0) {
+    } else if (shouldMonitorCurrentPage(currentTabState)) {
       // The maximum-refresh limit may stop the timer as the final navigation
       // begins. The final refreshed page must still receive its promised check.
       startMonitoringLoop();
@@ -154,12 +153,20 @@
     // Monitoring deliberately begins only after the first completed refresh.
     // Scan the rendered DOM immediately, then continue watching sites which
     // insert or replace their content after the load event.
-    if (currentTabState.monitorEnabled && currentTabState.targetText &&
-        Number(currentTabState.refreshCount || 0) > 0 && !hasTriggeredTarget) {
+    if (shouldMonitorCurrentPage(currentTabState) && !hasTriggeredTarget) {
       startMonitoringLoop();
-    } else if (!currentTabState.monitorEnabled || !currentTabState.targetText) {
+    } else if (!currentTabState.monitorEnabled || !currentTabState.targetText ||
+               currentTabState.monitoringSessionComplete === true) {
       stopMonitoringLoop();
     }
+  }
+
+  function shouldMonitorCurrentPage(state) {
+    return !!(state &&
+      state.monitorEnabled &&
+      state.targetText &&
+      Number(state.refreshCount || 0) > 0 &&
+      state.monitoringSessionComplete !== true);
   }
 
   function startMonitoringLoop() {
@@ -205,7 +212,7 @@
     if (monitorCheckTimer || hasTriggeredTarget) return;
     monitorCheckTimer = setTimeout(() => {
       monitorCheckTimer = null;
-      if (currentTabState && Number(currentTabState.refreshCount || 0) > 0 && currentTabState.monitorEnabled && !hasTriggeredTarget) {
+      if (shouldMonitorCurrentPage(currentTabState) && !hasTriggeredTarget) {
         checkPageMonitoring();
       }
     }, 100);
