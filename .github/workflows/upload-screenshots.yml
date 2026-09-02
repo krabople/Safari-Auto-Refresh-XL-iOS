@@ -74,6 +74,9 @@ jobs:
       - name: Replace localized screenshots on the draft version
         run: |
           set -euo pipefail
+          DELIVER_WORKDIR="$RUNNER_TEMP/deliver"
+          mkdir -p "$DELIVER_WORKDIR/fastlane/metadata"
+          cd "$DELIVER_WORKDIR"
           fastlane deliver \
             --api_key_path "$API_KEY_PATH" \
             --app_identifier "$APP_BUNDLE_ID" \
