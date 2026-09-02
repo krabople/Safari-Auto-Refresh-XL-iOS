@@ -133,6 +133,8 @@ jobs:
           find "$GITHUB_WORKSPACE/GeneratedProject" -name Info.plist -type f -print0 | while IFS= read -r -d '' plist; do
             /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Auto Refresh XL" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$plist"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName Auto Refresh XL" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add :CFBundleName string Auto Refresh XL" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist"
             /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$plist" 2>/dev/null || \
@@ -164,7 +166,9 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
+            INFOPLIST_KEY_CFBundleName="Auto Refresh XL"
 
       - name: Export App Store IPA
         env:

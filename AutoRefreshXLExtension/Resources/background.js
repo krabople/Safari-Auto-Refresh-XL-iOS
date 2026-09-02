@@ -85,7 +85,42 @@ function normalizeTabState(state) {
   // This flag belonged to an earlier worker instance and must never prevent a
   // newly-created Safari worker from resuming the timer after navigation.
   delete normalized.isRefreshing;
+
+  // Builds before 1.2.1 could leave a stopped tab with monitoring enabled
+  // after a successful detection. A newly injected content script would then
+  // detect the same target again on every manual navigation or reload.
+  if (!normalized.enabled && normalized.pendingDetection) {
+    normalized.monitorEnabled = false;
+    delete normalized.pendingDetection;
+  }
   return normalized;
+}
+
+async function disableCompletedMonitor(tabId, state) {
+  if (!state) return;
+
+  state.enabled = false;
+  state.monitorEnabled = false;
+  state.nextRefreshTime = 0;
+  delete state.pendingDetection;
+
+  // Popup drafts normally preserve the user's controls between openings.
+  // A completed monitor is different: the toggle must stay off when the popup
+  // reopens, otherwise starting a plain refresh silently re-arms it.
+  const { popupDrafts = {} } = await chrome.storage.local.get(['popupDrafts']);
+  const draftKey = String(tabId);
+  if (popupDrafts[draftKey]) {
+    popupDrafts[draftKey] = Object.assign({}, popupDrafts[draftKey], {
+      monitorEnabled: false
+    });
+  }
+
+  await chrome.storage.local.set({
+    tabStates: Object.fromEntries(
+      Object.entries(activeTabStates).map(([id, tabState]) => [id, normalizeTabState(tabState)])
+    ),
+    popupDrafts
+  });
 }
 
 // Initialize background worker
@@ -555,6 +590,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const state = tabId ? activeTabStates[tabId] : null;
     const targetTxt = (state && state.targetText) ? state.targetText : (request.targetText || 'Keyword');
 
+    // Ignore a late duplicate message from the previous content-script loop.
+    // A completed stop action disables monitoring before the alert is shown,
+    // so this also makes detection idempotent across navigation races.
+    if (state && state.monitorEnabled === false) {
+      sendResponse({ success: true, ignored: true });
+      return true;
+    }
+
     addLog('TARGET', '🎯 TARGET DETECTED! Keyword: "' + targetTxt + '"', 'success');
 
     const presentOnActiveTab = async (playWebSound) => {
@@ -590,24 +633,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     };
 
-    if (state) {
+    if (state && !state.actionStop) {
       state.pendingDetection = {
         targetText: targetTxt,
         matchType: state.matchType || 'text'
       };
       saveTabStates();
-      if (state.actionStop) {
-        state.enabled = false;
-        saveTabStates();
-        updateActiveTabBadge();
-        if (chrome.alarms && tabId) {
-          chrome.alarms.clear(`refresh_tab_${tabId}`);
-        }
-      }
-
     }
 
     (async () => {
+      if (state && state.actionStop) {
+        await disableCompletedMonitor(tabId, state);
+        updateActiveTabBadge();
+        if (chrome.alarms && tabId) {
+          await chrome.alarms.clear(`refresh_tab_${tabId}`);
+        }
+      }
+
       const shouldPlaySound = (!state || state.actionSound !== false) && (!state || state.soundEnabled !== false);
       const nativeSound = shouldPlaySound
         ? await playNativeAlertSound()
@@ -622,7 +664,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const presentation = await presentOnActiveTab(shouldPlaySound && !nativeSound.success);
 
       if (state && state.actionStop) {
-        await sendToTab(tabId, { type: 'REFRESH_STOPPED', preserveTargetAlert: true });
+        await sendToTab(tabId, { type: 'REFRESH_STOPPED', state, preserveTargetAlert: true });
         addLog('TARGET', `Auto-refresh stopped for tab ${tabId} because target was detected`);
       }
 

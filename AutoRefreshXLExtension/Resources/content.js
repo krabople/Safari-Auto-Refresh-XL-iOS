@@ -95,7 +95,11 @@
       soundAlertsEnabled = currentTabState.soundEnabled !== false;
       initContentFeatures();
     } else if (request.type === 'REFRESH_STOPPED') {
-      if (currentTabState) currentTabState.enabled = false;
+      if (request.state) {
+        currentTabState = request.state;
+      } else if (currentTabState) {
+        currentTabState.enabled = false;
+      }
       stopMonitoringLoop();
       removeOverlay();
     } else if (request.type === 'SOUND_PREFERENCE_SYNC') {

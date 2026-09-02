@@ -85,7 +85,7 @@
       "10s": "10s",
       "15m": "15m",
       "1m": "1m",
-      "30s": "années 30",
+      "30s": "30s",
       "5m": "5m",
       "5s": "5s",
       "Audio is unavailable": "Le son n'est pas disponible",
@@ -128,10 +128,10 @@
       "⚡ Auto-Start Rules": "⚡ Règles de démarrage automatique"
     },
     "es": {
-      "10s": "10",
+      "10s": "10s",
       "15m": "15m",
-      "1m": "1 metro",
-      "30s": "30 años",
+      "1m": "1m",
+      "30s": "30s",
       "5m": "5m",
       "5s": "5s",
       "Audio is unavailable": "El audio no está disponible",
@@ -174,10 +174,10 @@
       "⚡ Auto-Start Rules": "⚡ Reglas de inicio automático"
     },
     "it": {
-      "10s": "10 secondi",
+      "10s": "10s",
       "15m": "15m",
-      "1m": "1 m",
-      "30s": "'30",
+      "1m": "1m",
+      "30s": "30s",
       "5m": "5m",
       "5s": "5s",
       "Audio is unavailable": "L'audio non è disponibile",
@@ -223,7 +223,7 @@
       "10s": "10s",
       "15m": "15m",
       "1m": "1m",
-      "30s": "30 anos",
+      "30s": "30s",
       "5m": "5m",
       "5s": "5s",
       "Audio is unavailable": "O áudio não está disponível",
@@ -269,7 +269,7 @@
       "10s": "10s",
       "15m": "15m",
       "1m": "1m",
-      "30s": "Jaren '30",
+      "30s": "30s",
       "5m": "5m",
       "5s": "5s",
       "Audio is unavailable": "Audio is niet beschikbaar",
@@ -312,12 +312,12 @@
       "⚡ Auto-Start Rules": "⚡ Regels voor automatisch starten"
     },
     "ja": {
-      "10s": "10代",
-      "15m": "15メートル",
+      "10s": "10s",
+      "15m": "15m",
       "1m": "1m",
-      "30s": "30代",
+      "30s": "30s",
       "5m": "5m",
-      "5s": "5秒",
+      "5s": "5s",
       "Audio is unavailable": "音声が利用できません",
       "Auto Refresh": "Auto Refresh",
       "Auto Refresh XL": "Auto Refresh XL",
@@ -358,12 +358,12 @@
       "⚡ Auto-Start Rules": "⚡ 自動開始ルール"
     },
     "ko": {
-      "10s": "10초",
+      "10s": "10s",
       "15m": "15m",
       "1m": "1m",
-      "30s": "30대",
+      "30s": "30s",
       "5m": "5m",
-      "5s": "5초",
+      "5s": "5s",
       "Audio is unavailable": "오디오를 사용할 수 없습니다.",
       "Auto Refresh": "Auto Refresh",
       "Auto Refresh XL": "Auto Refresh XL",
@@ -404,12 +404,12 @@
       "⚡ Auto-Start Rules": "⚡ 자동 시작 규칙"
     },
     "zh-CN": {
-      "10s": "10秒",
+      "10s": "10s",
       "15m": "15m",
-      "1m": "1米",
-      "30s": "30秒",
+      "1m": "1m",
+      "30s": "30s",
       "5m": "5m",
-      "5s": "5秒",
+      "5s": "5s",
       "Audio is unavailable": "音频不可用",
       "Auto Refresh": "Auto Refresh",
       "Auto Refresh XL": "Auto Refresh XL",
@@ -450,12 +450,12 @@
       "⚡ Auto-Start Rules": "⚡ 自动启动规则"
     },
     "zh-TW": {
-      "10s": "10秒",
+      "10s": "10s",
       "15m": "15m",
-      "1m": "1米",
-      "30s": "30秒",
+      "1m": "1m",
+      "30s": "30s",
       "5m": "5m",
-      "5s": "5秒",
+      "5s": "5s",
       "Audio is unavailable": "音訊不可用",
       "Auto Refresh": "Auto Refresh",
       "Auto Refresh XL": "Auto Refresh XL",
@@ -505,8 +505,12 @@
       ? 'zh-CN'
       : (dictionaries[rawLanguage] ? rawLanguage : (dictionaries[rawLanguage.split('-')[0]] ? rawLanguage.split('-')[0] : 'en')));
   const dictionary = Object.assign({}, dictionaries[language] || {}, extraDictionaries[language] || {});
+  // Compact interval labels are language-neutral controls, not prose. Machine
+  // translation can interpret "30s" as a decade, an age group, or metres, so
+  // keep these UI tokens exactly as authored in every locale.
+  const isCompactDuration = source => /^\d+(?:\.\d+)?(?:s|m|h)$/.test(source);
   const t = (source, replacements = []) => {
-    let value = dictionary[source] || source;
+    let value = isCompactDuration(source) ? source : (dictionary[source] || source);
     replacements.forEach((replacement, index) => { value = value.replace(new RegExp(`\\$${index + 1}`, 'g'), replacement); });
     return value;
   };
@@ -520,7 +524,7 @@
       if (node.parentElement && ['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) continue;
       const source = node.nodeValue.trim();
       if (!source || !dictionary[source]) continue;
-      node.nodeValue = node.nodeValue.replace(source, dictionary[source]);
+      node.nodeValue = node.nodeValue.replace(source, t(source));
     }
     for (const element of root.querySelectorAll('[placeholder], [aria-label], [title]')) {
       for (const attribute of ['placeholder', 'aria-label', 'title']) {
