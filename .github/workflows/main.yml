@@ -112,6 +112,25 @@ jobs:
             --swift --ios-only --no-open --no-prompt --force \
             --project-location "$GITHUB_WORKSPACE/GeneratedProject"
 
+          # The converter wraps the Web Extension artwork in its own white app
+          # icon template. Replace every generated native app-icon rendition
+          # with the approved full-bleed artwork while retaining the sizes and
+          # filenames expected by the generated asset catalogue.
+          APP_ICON_SOURCE="$RESOURCES_DIR/icons/icon1024.png"
+          APP_ICON_SET="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*/Assets.xcassets/AppIcon.appiconset' -type d -print -quit)"
+          test -f "$APP_ICON_SOURCE"
+          test -n "$APP_ICON_SET"
+          APP_ICON_COUNT=0
+          while IFS= read -r -d '' app_icon; do
+            icon_width="$(sips -g pixelWidth "$app_icon" | awk '/pixelWidth:/{print $2}')"
+            icon_height="$(sips -g pixelHeight "$app_icon" | awk '/pixelHeight:/{print $2}')"
+            test -n "$icon_width"
+            test -n "$icon_height"
+            sips -s format png -z "$icon_height" "$icon_width" "$APP_ICON_SOURCE" --out "$app_icon" >/dev/null
+            APP_ICON_COUNT=$((APP_ICON_COUNT + 1))
+          done < <(find "$APP_ICON_SET" -name '*.png' -type f -print0)
+          test "$APP_ICON_COUNT" -gt 0
+
           APP_VIEW_CONTROLLER="$(find "$GITHUB_WORKSPACE/GeneratedProject" -path '*/ViewController.swift' -not -path '*Extension*' -print -quit)"
           APP_SOURCE_DIR="$(dirname "$APP_VIEW_CONTROLLER")"
           cp "$GITHUB_WORKSPACE/AutoRefreshXL/ViewController.swift" "$APP_SOURCE_DIR/ViewController.swift"
@@ -134,6 +153,8 @@ jobs:
           find "$GITHUB_WORKSPACE/GeneratedProject" -name Info.plist -type f -print0 | while IFS= read -r -d '' plist; do
             /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Auto Refresh XL" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Auto Refresh XL" "$plist"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName Auto Refresh XL" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add :CFBundleName string Auto Refresh XL" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$plist" 2>/dev/null || \
               /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" "$plist"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || \
@@ -169,6 +190,8 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             MARKETING_VERSION="$MARKETING_VERSION" \
+            INFOPLIST_KEY_CFBundleDisplayName="Auto Refresh XL" \
+            INFOPLIST_KEY_CFBundleName="Auto Refresh XL" \
             INFOPLIST_KEY_CFBundleShortVersionString="$MARKETING_VERSION"
 
       - name: Export App Store IPA
