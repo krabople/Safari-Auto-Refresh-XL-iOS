@@ -1,0 +1,1 @@
+• Il monitoraggio delle parole chiave ora riconosce come equivalenti trattini, lineette, apostrofi, virgolette e spazi visivamente simili.

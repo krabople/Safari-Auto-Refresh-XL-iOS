@@ -1,0 +1,1 @@
+• Se ha mejorado la monitorización de palabras clave para reconocer como equivalentes guiones, rayas, apóstrofos, comillas y espacios visualmente similares.

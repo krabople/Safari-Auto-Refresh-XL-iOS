@@ -1,0 +1,1 @@
+• Die Stichwortüberwachung wurde verbessert: Ähnliche Bindestriche, Gedankenstriche, Apostrophe, Anführungszeichen und Leerzeichen werden jetzt als gleichwertig erkannt.

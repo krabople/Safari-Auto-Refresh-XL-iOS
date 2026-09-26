@@ -1,0 +1,1 @@
+• Improved keyword monitoring so visually similar hyphens, dashes, apostrophes, quotation marks, and spaces are recognized as equivalent.

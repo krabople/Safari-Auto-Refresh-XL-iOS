@@ -6,11 +6,11 @@ on:
       app_version:
         description: App Store version to submit
         required: true
-        default: 1.2.0
+        default: 1.2.1
       build_number:
         description: Processed App Store Connect build number
         required: true
-        default: '125'
+        default: '127'
       confirmation:
         description: Type SUBMIT to authorize the App Review submission
         required: true
@@ -79,5 +79,7 @@ jobs:
             --skip_binary_upload true \
             --skip_screenshots true \
             --submit_for_review true \
+            --automatic_release true \
+            --phased_release false \
             --force true \
             --run_precheck_before_submit false

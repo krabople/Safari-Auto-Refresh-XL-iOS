@@ -1,0 +1,1 @@
+• La surveillance des mots-clés reconnaît désormais comme équivalents les traits d’union, tirets, apostrophes, guillemets et espaces visuellement similaires.
