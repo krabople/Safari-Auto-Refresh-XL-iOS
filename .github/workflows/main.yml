@@ -19,7 +19,7 @@ jobs:
       TEAM_ID: 6YYA8L76Y8
       APP_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8
       EXTENSION_BUNDLE_ID: com.yourCompany.Safari-Auto-Refresh-and-Page-Monitor-XL.6YYA8L76Y8.Extension
-      MARKETING_VERSION: 1.2.0
+      MARKETING_VERSION: 1.2.1
 
     steps:
       - name: Check out repository
