@@ -257,7 +257,7 @@
       const bodyText = getPageText(sourceDocument);
       isFound = normalizePlainText(bodyText).includes(normalizePlainText(target));
       if (isFound) {
-        matchedNode = findTextNodeMatching(new RegExp(escapeRegExp(target), 'i'), sourceDocument);
+        matchedNode = findTextNodeMatching(createPlainTextMatcher(target, 'i'), sourceDocument);
       }
     }
 
@@ -426,7 +426,7 @@
         try {
           const regex = request.matchType === 'regex'
             ? new RegExp(request.targetText, 'i')
-            : new RegExp(escapeRegExp(request.targetText), 'i');
+            : createPlainTextMatcher(request.targetText, 'i');
           const matchedNode = findTextNodeMatching(regex, document);
           matchedElement = matchedNode && (matchedNode.parentElement || matchedNode);
         } catch (error) {}
@@ -460,10 +460,66 @@
     }).join(' ');
   }
 
-  function normalizePlainText(value) {
+  // Visually interchangeable punctuation is represented by several Unicode
+  // code points on real web pages. Plain-text monitoring treats these groups
+  // as equivalent, while Regex and XPath modes deliberately remain exact.
+  const DASH_CHARACTERS = '-\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d';
+  const SINGLE_QUOTE_CHARACTERS = "'\u2018\u2019\u201a\u201b\u2032\u02bc\uff07";
+  const DOUBLE_QUOTE_CHARACTERS = '"\u201c\u201d\u201e\u201f\u2033\uff02';
+  const INVISIBLE_FORMATTING_CHARACTERS = '\u00ad\u200b\u2060\ufeff';
+  const DASH_REGEX = /[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d]/g;
+  const SINGLE_QUOTE_REGEX = /['\u2018\u2019\u201a\u201b\u2032\u02bc\uff07]/g;
+  const DOUBLE_QUOTE_REGEX = /["\u201c\u201d\u201e\u201f\u2033\uff02]/g;
+  const INVISIBLE_FORMATTING_REGEX = /[\u00ad\u200b\u2060\ufeff]/g;
+
+  function canonicalizePlainTextCharacters(value) {
     const text = String(value || '');
     const compatible = typeof text.normalize === 'function' ? text.normalize('NFKC') : text;
-    return compatible.replace(/[\u00a0\s]+/g, ' ').trim().toLocaleLowerCase();
+    return compatible
+      .replace(INVISIBLE_FORMATTING_REGEX, '')
+      .replace(DASH_REGEX, '-')
+      .replace(SINGLE_QUOTE_REGEX, "'")
+      .replace(DOUBLE_QUOTE_REGEX, '"');
+  }
+
+  function normalizePlainText(value) {
+    return canonicalizePlainTextCharacters(value)
+      .replace(/[\u00a0\s]+/g, ' ')
+      .trim()
+      .toLocaleLowerCase();
+  }
+
+  function escapeRegExpCharacterClass(value) {
+    return value.replace(/[\\\]\-^]/g, '\\$&');
+  }
+
+  function createPlainTextMatcher(value, flags = 'i') {
+    const compatible = canonicalizePlainTextCharacters(value);
+    const invisiblePattern = `[${escapeRegExpCharacterClass(INVISIBLE_FORMATTING_CHARACTERS)}]*`;
+    let pattern = '';
+    let previousWasWhitespace = false;
+
+    for (const character of compatible) {
+      if (/[\u00a0\s]/.test(character)) {
+        if (!previousWasWhitespace) pattern += '[\\s\\u00a0]+';
+        previousWasWhitespace = true;
+        continue;
+      }
+
+      previousWasWhitespace = false;
+      if (character === '-') {
+        pattern += `[${escapeRegExpCharacterClass(DASH_CHARACTERS)}]`;
+      } else if (character === "'") {
+        pattern += `[${escapeRegExpCharacterClass(SINGLE_QUOTE_CHARACTERS)}]`;
+      } else if (character === '"') {
+        pattern += `[${escapeRegExpCharacterClass(DOUBLE_QUOTE_CHARACTERS)}]`;
+      } else {
+        pattern += escapeRegExp(character);
+      }
+      pattern += invisiblePattern;
+    }
+
+    return new RegExp(pattern, flags);
   }
 
   function getSearchRoots(sourceDocument = document) {
@@ -505,7 +561,7 @@
       } else if (matchType === 'xpath') {
         return null;
       } else {
-        regex = new RegExp(escapeRegExp(targetText), 'gi');
+        regex = createPlainTextMatcher(targetText, 'gi');
       }
     } catch (e) {
       return null;

@@ -163,6 +163,65 @@ function inspectContentMonitoringStartup(state) {
   return { timeoutCount, intervalCount, observerCount };
 }
 
+function loadContentTextHelpers() {
+  const event = () => ({ addListener() {} });
+  const root = {};
+  const instrumentedSource = contentSource.replace(
+    /\}\)\(\);\s*$/,
+    'window.__contentTextHelpers = { normalizePlainText, createPlainTextMatcher };\n})();'
+  );
+  const context = vm.createContext({
+    window: null,
+    document: { body: root, documentElement: root },
+    chrome: {
+      runtime: {
+        lastError: null,
+        onMessage: event(),
+        sendMessage(request, callback) {
+          if (request.type === 'GET_TAB_STATE' && callback) callback({ state: null });
+        }
+      }
+    },
+    MutationObserver: class { observe() {} disconnect() {} },
+    console: { log() {}, warn() {}, error() {} },
+    clearInterval() {},
+    clearTimeout() {},
+    setInterval() { return 1; },
+    setTimeout() { return 1; }
+  });
+  context.window = context;
+  context.top = context;
+  context.addEventListener = () => {};
+  context.removeEventListener = () => {};
+
+  vm.runInContext(instrumentedSource, context);
+  return context.__contentTextHelpers;
+}
+
+function testPlainTextPunctuationEquivalence() {
+  const { normalizePlainText, createPlainTextMatcher } = loadContentTextHelpers();
+  const dashVariants = ['-', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212', '\ufe58', '\ufe63', '\uff0d'];
+
+  for (const dash of dashVariants) {
+    assert.equal(
+      normalizePlainText(`Showing items 1${dash}11`),
+      'showing items 1-11',
+      `Dash variant U+${dash.codePointAt(0).toString(16).toUpperCase()} was not normalized`
+    );
+    assert.equal(createPlainTextMatcher('1-11', 'i').test(`1${dash}11`), true);
+  }
+
+  assert.equal(normalizePlainText('Don\u2019t stop'), normalizePlainText("don't stop"));
+  assert.equal(createPlainTextMatcher("don't", 'i').test('DON\u2019T'), true);
+  assert.equal(createPlainTextMatcher('"quoted"', 'i').test('\u201cquoted\u201d'), true);
+  assert.equal(createPlainTextMatcher('one two', 'i').test('one\u00a0  two'), true);
+  assert.equal(createPlainTextMatcher('cooperate', 'i').test('co\u00adoperate'), true);
+
+  const actualPageMatch = createPlainTextMatcher('1-11', 'i').exec('Showing items 1\u201311');
+  assert.equal(actualPageMatch?.[0], '1\u201311', 'Highlight matcher must retain the page\'s actual text');
+  assert.equal(/1-11/i.test('1\u201311'), false, 'Regex mode should remain literal');
+}
+
 async function testCompletedMonitoringSessionIsIdempotent() {
   const harness = createBackgroundHarness({
     popupDrafts: {
@@ -324,6 +383,7 @@ function testEveryLocaleHasTheSameSupplementalKeys() {
 await testCompletedMonitoringSessionIsIdempotent();
 await testCompletedStateSurvivesWorkerRestartAndLegacyUpgrade();
 testContentScriptDoesNotRearmCompletedSession();
+testPlainTextPunctuationEquivalence();
 testCompactDurationsRemainInvariant();
 testEveryLocaleHasTheSameSupplementalKeys();
 console.log('All monitoring and localisation regression tests passed.');
