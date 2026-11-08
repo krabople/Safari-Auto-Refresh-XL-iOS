@@ -39,3 +39,20 @@ builds.sort_by { |build| build.dig("attributes", "uploadedDate").to_s }.reverse_
     "id=#{build["id"]}"
   ].join(" ")
 end
+
+uploads_uri = URI("https://api.appstoreconnect.apple.com/v1/apps/6809041904/buildUploads")
+uploads_uri.query = URI.encode_www_form(
+  "fields[buildUploads]" => "cfBundleShortVersionString,cfBundleVersion,createdDate,state,platform,uploadedDate",
+  "limit" => "50"
+)
+uploads_request = Net::HTTP::Get.new(uploads_uri)
+uploads_request["Authorization"] = "Bearer #{token}"
+uploads_response = Net::HTTP.start(uploads_uri.hostname, uploads_uri.port, use_ssl: true) { |http| http.request(uploads_request) }
+abort "Build uploads request returned #{uploads_response.code}: #{uploads_response.body}" unless uploads_response.is_a?(Net::HTTPSuccess)
+
+uploads = JSON.parse(uploads_response.body).fetch("data")
+puts "App Store Connect returned #{uploads.length} Listello build upload record(s)."
+uploads.sort_by { |upload| upload.dig("attributes", "createdDate").to_s }.reverse_each do |upload|
+  attributes = upload.fetch("attributes")
+  puts "upload=#{upload["id"]} attributes=#{JSON.generate(attributes)}"
+end
