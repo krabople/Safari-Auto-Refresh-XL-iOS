@@ -71,19 +71,18 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "APPSTORE_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Create and import a retained development identity
+      - name: Create and install a Listello App Store profile
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          IDENTITY_DIR="$RUNNER_TEMP/listello-development-identity"
-          mkdir -p "$IDENTITY_DIR"
-          openssl req -new -newkey rsa:2048 -nodes \
-            -keyout "$IDENTITY_DIR/private.key" \
-            -out "$IDENTITY_DIR/request.csr" \
-            -subj "/CN=Listello GitHub Development"
+          PROFILE_DIR="$RUNNER_TEMP/listello-signing-profile"
+          mkdir -p "$PROFILE_DIR"
+          security find-certificate -c "Apple Distribution" -p signing_temp.keychain \
+            | openssl x509 -noout -serial \
+            | cut -d= -f2 > "$PROFILE_DIR/certificate-serial"
 
           ruby <<'RUBY'
           require "base64"
@@ -104,46 +103,54 @@ jobs:
           parts = OpenSSL::ASN1.decode(asn1).value
           token = "#{unsigned}.#{base64url(parts.map { |part| fixed_width(part.value) }.join)}"
 
-          identity_dir = File.join(ENV.fetch("RUNNER_TEMP"), "listello-development-identity")
+          profile_dir = File.join(ENV.fetch("RUNNER_TEMP"), "listello-signing-profile")
+          serial = File.read(File.join(profile_dir, "certificate-serial")).strip.upcase
+          certificates_uri = URI("https://api.appstoreconnect.apple.com/v1/certificates?filter%5BcertificateType%5D=DISTRIBUTION&limit=200")
+          certificates_request = Net::HTTP::Get.new(certificates_uri)
+          certificates_request["Authorization"] = "Bearer #{token}"
+          certificates_response = Net::HTTP.start(certificates_uri.hostname, certificates_uri.port, use_ssl: true) { |http| http.request(certificates_request) }
+          abort "Certificate lookup failed (HTTP #{certificates_response.code}): #{certificates_response.body}" unless certificates_response.is_a?(Net::HTTPSuccess)
+          certificate = JSON.parse(certificates_response.body).fetch("data").find do |candidate|
+            candidate.fetch("attributes").fetch("serialNumber").upcase == serial
+          end
+          abort "The imported Apple Distribution certificate was not found in App Store Connect." unless certificate
+
+          profile_name = "Listello iCloud Signing Check #{ENV.fetch("GITHUB_RUN_ID")}"
           body = {
             data: {
-              type: "certificates",
+              type: "profiles",
               attributes: {
-                certificateType: "DEVELOPMENT",
-                csrContent: File.read(File.join(identity_dir, "request.csr"))
+                name: profile_name,
+                profileType: "IOS_APP_STORE"
+              },
+              relationships: {
+                bundleId: {data: {type: "bundleIds", id: "ALQR4P268Z"}},
+                certificates: {data: [{type: "certificates", id: certificate.fetch("id")}]}
               }
             }
           }
-          uri = URI("https://api.appstoreconnect.apple.com/v1/certificates")
+          uri = URI("https://api.appstoreconnect.apple.com/v1/profiles")
           request = Net::HTTP::Post.new(uri)
           request["Authorization"] = "Bearer #{token}"
           request["Content-Type"] = "application/json"
           request.body = JSON.generate(body)
           response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
-          abort "Certificate creation failed (HTTP #{response.code}): #{response.body}" unless response.is_a?(Net::HTTPSuccess)
-          certificate = JSON.parse(response.body).fetch("data")
+          abort "Profile creation failed (HTTP #{response.code}): #{response.body}" unless response.is_a?(Net::HTTPSuccess)
+          profile = JSON.parse(response.body).fetch("data")
           File.binwrite(
-            File.join(identity_dir, "certificate.cer"),
-            Base64.decode64(certificate.fetch("attributes").fetch("certificateContent"))
+            File.join(profile_dir, "Listello.mobileprovision"),
+            Base64.decode64(profile.fetch("attributes").fetch("profileContent"))
           )
-          File.write(File.join(identity_dir, "certificate-id"), certificate.fetch("id"))
-          puts "Created development certificate #{certificate.fetch("id")} with its private key retained in this runner."
+          File.write(File.join(profile_dir, "profile-id"), profile.fetch("id"))
+          File.write(File.join(profile_dir, "profile-name"), profile_name)
+          puts "Created App Store profile #{profile.fetch("id")} for the imported distribution identity."
           RUBY
 
-          openssl x509 -inform DER \
-            -in "$IDENTITY_DIR/certificate.cer" \
-            -out "$IDENTITY_DIR/certificate.pem"
-          DEV_P12_PASSWORD="$(openssl rand -hex 24)"
-          openssl pkcs12 -export \
-            -inkey "$IDENTITY_DIR/private.key" \
-            -in "$IDENTITY_DIR/certificate.pem" \
-            -out "$IDENTITY_DIR/development.p12" \
-            -passout "pass:$DEV_P12_PASSWORD"
-          security import "$IDENTITY_DIR/development.p12" \
-            -P "$DEV_P12_PASSWORD" \
-            -A \
-            -T /usr/bin/codesign
-          security find-identity -v -p codesigning
+          security cms -D -i "$PROFILE_DIR/Listello.mobileprovision" > "$PROFILE_DIR/profile.plist"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_DIR/profile.plist")"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_DIR/Listello.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "LISTELLO_PROFILE_NAME=$(cat "$PROFILE_DIR/profile-name")" >> "$GITHUB_ENV"
 
       - name: Provision capabilities and build signed app
         working-directory: Listello
@@ -156,24 +163,23 @@ jobs:
           xcodebuild build \
             -project Listello.xcodeproj \
             -scheme Listello \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -derivedDataPath .build/DerivedData-Signing-Check \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$APPSTORE_KEY_PATH" \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$LISTELLO_PROFILE_NAME" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
             | xcbeautify --renderer github-actions
 
       - name: Verify signed iCloud entitlements
         working-directory: Listello
         run: |
           set -euo pipefail
-          APP_PATH=".build/DerivedData-Signing-Check/Build/Products/Debug-iphoneos/Listello.app"
+          APP_PATH=".build/DerivedData-Signing-Check/Build/Products/Release-iphoneos/Listello.app"
           codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/listello-entitlements.plist"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.ubiquity-kvstore-identifier" "$RUNNER_TEMP/listello-entitlements.plist" \
             | grep -F "com.krabople.morrow"
@@ -181,7 +187,7 @@ jobs:
             | grep -E "development|production"
           echo "Listello signed device build contains its iCloud key-value and push entitlements."
 
-      - name: Revoke temporary development certificate
+      - name: Delete temporary App Store profile
         if: always()
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
@@ -189,9 +195,9 @@ jobs:
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          CERTIFICATE_ID_FILE="$RUNNER_TEMP/listello-development-identity/certificate-id"
-          [ -f "$CERTIFICATE_ID_FILE" ] || exit 0
-          export LISTELLO_TEMP_CERTIFICATE_ID="$(cat "$CERTIFICATE_ID_FILE")"
+          PROFILE_ID_FILE="$RUNNER_TEMP/listello-signing-profile/profile-id"
+          [ -f "$PROFILE_ID_FILE" ] || exit 0
+          export LISTELLO_TEMP_PROFILE_ID="$(cat "$PROFILE_ID_FILE")"
           ruby <<'RUBY'
           require "base64"
           require "json"
@@ -211,11 +217,11 @@ jobs:
           parts = OpenSSL::ASN1.decode(asn1).value
           token = "#{unsigned}.#{base64url(parts.map { |part| fixed_width(part.value) }.join)}"
 
-          certificate_id = ENV.fetch("LISTELLO_TEMP_CERTIFICATE_ID")
-          uri = URI("https://api.appstoreconnect.apple.com/v1/certificates/#{certificate_id}")
+          profile_id = ENV.fetch("LISTELLO_TEMP_PROFILE_ID")
+          uri = URI("https://api.appstoreconnect.apple.com/v1/profiles/#{profile_id}")
           request = Net::HTTP::Delete.new(uri)
           request["Authorization"] = "Bearer #{token}"
           response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
-          abort "Certificate cleanup failed (HTTP #{response.code}): #{response.body}" unless [204, 404].include?(response.code.to_i)
-          puts "Revoked temporary development certificate #{certificate_id}."
+          abort "Profile cleanup failed (HTTP #{response.code}): #{response.body}" unless [204, 404].include?(response.code.to_i)
+          puts "Deleted temporary App Store profile #{profile_id}."
           RUBY
