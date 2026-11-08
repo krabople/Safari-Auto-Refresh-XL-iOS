@@ -49,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           swift Support/generate-icon.swift Artwork/ListelloSource.jpg Listello/Resources/Assets.xcassets/AppIcon.appiconset/ListelloIcon-1024.png
+          ruby -i -ne 'print unless /^\s+(CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE_SPECIFIER):/' project.yml
           xcodegen generate
 
       - name: Import Apple distribution certificate
@@ -89,8 +90,6 @@ jobs:
             -authenticationKeyID "$APPSTORE_KEY_ID" \
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY= \
-            PROVISIONING_PROFILE_SPECIFIER= \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             | xcbeautify --renderer github-actions
 
