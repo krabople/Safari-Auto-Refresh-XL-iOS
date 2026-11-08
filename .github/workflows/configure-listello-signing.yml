@@ -134,7 +134,6 @@ jobs:
             -out "$IDENTITY_DIR/certificate.pem"
           DEV_P12_PASSWORD="$(openssl rand -hex 24)"
           openssl pkcs12 -export \
-            -legacy \
             -inkey "$IDENTITY_DIR/private.key" \
             -in "$IDENTITY_DIR/certificate.pem" \
             -out "$IDENTITY_DIR/development.p12" \
