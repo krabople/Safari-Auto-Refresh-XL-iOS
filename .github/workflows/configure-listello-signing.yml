@@ -2,6 +2,12 @@ name: Configure Listello Apple signing
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: Build and upload the current Listello main branch to TestFlight
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -153,6 +159,7 @@ jobs:
           echo "LISTELLO_PROFILE_NAME=$(cat "$PROFILE_DIR/profile-name")" >> "$GITHUB_ENV"
 
       - name: Provision capabilities and build signed app
+        if: ${{ !inputs.upload_to_testflight }}
         working-directory: Listello
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
@@ -176,6 +183,7 @@ jobs:
             | xcbeautify --renderer github-actions
 
       - name: Verify signed iCloud entitlements
+        if: ${{ !inputs.upload_to_testflight }}
         working-directory: Listello
         run: |
           set -euo pipefail
@@ -186,6 +194,107 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :aps-environment" "$RUNNER_TEMP/listello-entitlements.plist" \
             | grep -E "development|production"
           echo "Listello signed device build contains its iCloud key-value and push entitlements."
+
+      - name: Generate unique TestFlight build number
+        if: ${{ inputs.upload_to_testflight }}
+        run: echo "LISTELLO_BUILD_NUMBER=$(date -u +%y%m%d%H%M)" >> "$GITHUB_ENV"
+
+      - name: Archive and export signed TestFlight IPA
+        if: ${{ inputs.upload_to_testflight }}
+        id: testflight
+        working-directory: Listello
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          xcodebuild archive \
+            -project Listello.xcodeproj \
+            -scheme Listello \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath .build/Archives/Listello.xcarchive \
+            -derivedDataPath .build/DerivedData-TestFlight \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$LISTELLO_PROFILE_NAME" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$LISTELLO_BUILD_NUMBER" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            | xcbeautify --renderer github-actions
+
+          cp Support/ExportOptions.plist "$RUNNER_TEMP/ListelloExportOptions.plist"
+          perl -0pi -e 's/AppStore Morrow Shared GitHub/$ENV{LISTELLO_PROFILE_NAME}/g' "$RUNNER_TEMP/ListelloExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath .build/Archives/Listello.xcarchive \
+            -exportOptionsPlist "$RUNNER_TEMP/ListelloExportOptions.plist" \
+            -exportPath .build/Export \
+            | xcbeautify --renderer github-actions
+
+          IPA_PATH="$(find "$PWD/.build/Export" -name '*.ipa' -print -quit)"
+          test -n "$IPA_PATH"
+          echo "ipa-path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Verify TestFlight package
+        if: ${{ inputs.upload_to_testflight }}
+        working-directory: Listello
+        run: |
+          set -euo pipefail
+          IPA_PATH="${{ steps.testflight.outputs.ipa-path }}"
+          AUDIT_DIR="$(mktemp -d "$RUNNER_TEMP/listello-ipa-audit.XXXXXX")"
+          unzip -q "$IPA_PATH" -d "$AUDIT_DIR"
+          APP_BUNDLE="$(find "$AUDIT_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          INFO_PLIST="$APP_BUNDLE/Info.plist"
+
+          codesign -d --entitlements :- "$APP_BUNDLE" > "$RUNNER_TEMP/listello-testflight-entitlements.plist"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.ubiquity-kvstore-identifier" "$RUNNER_TEMP/listello-testflight-entitlements.plist" \
+            | grep -F "com.krabople.morrow"
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$RUNNER_TEMP/listello-testflight-entitlements.plist" \
+            | grep -F "production"
+
+          ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$INFO_PLIST")"
+          test "$ICON_NAME" = "AppIcon"
+          find_icon_with_size() {
+            expected="$1"
+            find "$APP_BUNDLE" -maxdepth 1 -type f -name '*.png' -print | while IFS= read -r icon; do
+              width="$(sips -g pixelWidth "$icon" 2>/dev/null | awk '/pixelWidth/ {print $2}')"
+              height="$(sips -g pixelHeight "$icon" 2>/dev/null | awk '/pixelHeight/ {print $2}')"
+              if [ "$width" = "$expected" ] && [ "$height" = "$expected" ]; then
+                echo "$icon"
+              fi
+            done
+          }
+          test -n "$(find_icon_with_size 120)"
+          test -n "$(find_icon_with_size 152)"
+          echo "Verified production iCloud, push, and required app-icon packaging."
+
+      - name: Keep signed TestFlight IPA as an artifact
+        if: ${{ inputs.upload_to_testflight }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Listello-TestFlight-IPA-${{ env.LISTELLO_BUILD_NUMBER }}
+          path: ${{ steps.testflight.outputs.ipa-path }}
+          if-no-files-found: error
+
+      - name: Upload Listello to TestFlight
+        if: ${{ inputs.upload_to_testflight }}
+        uses: Apple-Actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ steps.testflight.outputs.ipa-path }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          wait-for-processing: "false"
+
+      - name: Confirm Apple processing completed
+        if: ${{ inputs.upload_to_testflight }}
+        working-directory: Listello
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APP_STORE_APP_ID: "6809041904"
+          BUILD_NUMBER: ${{ env.LISTELLO_BUILD_NUMBER }}
+        run: ruby Support/check-testflight.rb
 
       - name: Delete temporary App Store profile
         if: always()
