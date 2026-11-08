@@ -126,6 +126,7 @@ jobs:
             File.join(identity_dir, "certificate.cer"),
             Base64.decode64(certificate.fetch("attributes").fetch("certificateContent"))
           )
+          File.write(File.join(identity_dir, "certificate-id"), certificate.fetch("id"))
           puts "Created development certificate #{certificate.fetch("id")} with its private key retained in this runner."
           RUBY
 
@@ -174,8 +175,47 @@ jobs:
           set -euo pipefail
           APP_PATH=".build/Archives/Listello-Signing-Check.xcarchive/Products/Applications/Listello.app"
           codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/listello-entitlements.plist"
-          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.icloud-container-identifiers" "$RUNNER_TEMP/listello-entitlements.plist" \
-            | grep -F "iCloud.com.krabople.morrow"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.ubiquity-kvstore-identifier" "$RUNNER_TEMP/listello-entitlements.plist" \
+            | grep -F "com.krabople.morrow"
           /usr/libexec/PlistBuddy -c "Print :aps-environment" "$RUNNER_TEMP/listello-entitlements.plist" \
             | grep -E "development|production"
-          echo "Listello archive contains its iCloud container and push entitlement."
+          echo "Listello archive contains its iCloud key-value and push entitlements."
+
+      - name: Revoke temporary development certificate
+        if: always()
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          CERTIFICATE_ID_FILE="$RUNNER_TEMP/listello-development-identity/certificate-id"
+          [ -f "$CERTIFICATE_ID_FILE" ] || exit 0
+          export LISTELLO_TEMP_CERTIFICATE_ID="$(cat "$CERTIFICATE_ID_FILE")"
+          ruby <<'RUBY'
+          require "base64"
+          require "json"
+          require "net/http"
+          require "openssl"
+          require "uri"
+
+          def base64url(value) = Base64.urlsafe_encode64(value).delete("=")
+          def fixed_width(value) = [value.to_i.to_s(16).rjust(64, "0")].pack("H*")
+
+          now = Time.now.to_i
+          header = base64url({alg: "ES256", kid: ENV.fetch("APPSTORE_KEY_ID"), typ: "JWT"}.to_json)
+          payload = base64url({iss: ENV.fetch("APPSTORE_ISSUER_ID"), iat: now, exp: now + 900, aud: "appstoreconnect-v1"}.to_json)
+          unsigned = "#{header}.#{payload}"
+          key = OpenSSL::PKey.read(ENV.fetch("APPSTORE_PRIVATE_KEY"))
+          asn1 = key.dsa_sign_asn1(OpenSSL::Digest::SHA256.digest(unsigned))
+          parts = OpenSSL::ASN1.decode(asn1).value
+          token = "#{unsigned}.#{base64url(parts.map { |part| fixed_width(part.value) }.join)}"
+
+          certificate_id = ENV.fetch("LISTELLO_TEMP_CERTIFICATE_ID")
+          uri = URI("https://api.appstoreconnect.apple.com/v1/certificates/#{certificate_id}")
+          request = Net::HTTP::Delete.new(uri)
+          request["Authorization"] = "Bearer #{token}"
+          response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
+          abort "Certificate cleanup failed (HTTP #{response.code}): #{response.body}" unless [204, 404].include?(response.code.to_i)
+          puts "Revoked temporary development certificate #{certificate_id}."
+          RUBY
