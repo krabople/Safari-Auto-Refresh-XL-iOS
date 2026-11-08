@@ -70,7 +70,7 @@ jobs:
           chmod 600 "$KEY_DIR/AuthKey_${APPSTORE_KEY_ID}.p8"
           echo "APPSTORE_KEY_PATH=$KEY_DIR/AuthKey_${APPSTORE_KEY_ID}.p8" >> "$GITHUB_ENV"
 
-      - name: Report Listello capabilities
+      - name: Configure Listello capabilities and App Store profile
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
@@ -81,6 +81,7 @@ jobs:
           require "json"
           require "net/http"
           require "openssl"
+          require "fileutils"
           require "uri"
 
           def base64url(value) = Base64.urlsafe_encode64(value).delete("=")
@@ -95,23 +96,114 @@ jobs:
           parts = OpenSSL::ASN1.decode(signature).value
           token = "#{unsigned}.#{base64url(parts.map { |part| fixed_width(part.value) }.join)}"
 
-          uri = URI("https://api.appstoreconnect.apple.com/v1/bundleIds?filter[identifier]=com.krabople.morrow&include=bundleIdCapabilities&fields[bundleIds]=name,identifier&fields[bundleIdCapabilities]=capabilityType,settings")
-          request = Net::HTTP::Get.new(uri)
-          request["Authorization"] = "Bearer #{token}"
-          response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
-          abort "Capability lookup failed (HTTP #{response.code}): #{response.body}" unless response.is_a?(Net::HTTPSuccess)
-          body = JSON.parse(response.body)
-          capabilities = body.fetch("included", []).map { |item| item.fetch("attributes") }
-          puts JSON.pretty_generate(capabilities)
+          def api(method, path, token, body = nil)
+            uri = URI("https://api.appstoreconnect.apple.com#{path}")
+            request_class = {
+              get: Net::HTTP::Get,
+              post: Net::HTTP::Post,
+              delete: Net::HTTP::Delete
+            }.fetch(method)
+            request = request_class.new(uri)
+            request["Authorization"] = "Bearer #{token}"
+            if body
+              request["Content-Type"] = "application/json"
+              request.body = JSON.generate(body)
+            end
+            response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
+            abort "Apple API #{method.upcase} #{path} failed (HTTP #{response.code}): #{response.body}" unless response.is_a?(Net::HTTPSuccess)
+            response.body.empty? ? {} : JSON.parse(response.body)
+          end
+
+          bundle_response = api(
+            :get,
+            "/v1/bundleIds?filter[identifier]=com.krabople.morrow&include=bundleIdCapabilities&fields[bundleIds]=name,identifier&fields[bundleIdCapabilities]=capabilityType,settings",
+            token
+          )
+          bundle = bundle_response.fetch("data").first or abort "Listello bundle ID was not found"
+          bundle_id = bundle.fetch("id")
+          enabled = bundle_response.fetch("included", []).filter_map do |item|
+            item.dig("attributes", "capabilityType") if item["type"] == "bundleIdCapabilities"
+          end
+
+          capability_settings = {
+            "ICLOUD" => [{
+              key: "ICLOUD_VERSION",
+              options: [{key: "XCODE_6", enabled: true}]
+            }],
+            "PUSH_NOTIFICATIONS" => nil
+          }
+
+          capability_settings.each do |capability_type, settings|
+            next if enabled.include?(capability_type)
+            attributes = {capabilityType: capability_type}
+            attributes[:settings] = settings if settings
+            api(:post, "/v1/bundleIdCapabilities", token, {
+              data: {
+                type: "bundleIdCapabilities",
+                attributes: attributes,
+                relationships: {
+                  bundleId: {data: {type: "bundleIds", id: bundle_id}}
+                }
+              }
+            })
+            puts "Enabled #{capability_type}"
+          end
+
+          profiles_response = api(
+            :get,
+            "/v1/profiles?filter[profileType]=IOS_APP_STORE&include=bundleId,certificates&fields[profiles]=name,uuid,profileContent,profileState,profileType&limit=200",
+            token
+          )
+          listello_profiles = profiles_response.fetch("data").select do |profile|
+            profile.dig("relationships", "bundleId", "data", "id") == bundle_id
+          end
+          source_profile = listello_profiles.find { |profile| profile.dig("attributes", "name").include?("Morrow") } || listello_profiles.first
+          abort "No existing Listello App Store profile was found to identify its distribution certificate" unless source_profile
+          certificate_id = source_profile.dig("relationships", "certificates", "data", 0, "id")
+          abort "The existing Listello profile has no distribution certificate" unless certificate_id
+
+          profile_name = "AppStore Listello iCloud GitHub"
+          existing = listello_profiles.find { |profile| profile.dig("attributes", "name") == profile_name }
+          if existing
+            api(:delete, "/v1/profiles/#{existing.fetch("id")}", token)
+          end
+
+          profile_response = api(:post, "/v1/profiles", token, {
+            data: {
+              type: "profiles",
+              attributes: {
+                name: profile_name,
+                profileType: "IOS_APP_STORE"
+              },
+              relationships: {
+                bundleId: {data: {type: "bundleIds", id: bundle_id}},
+                certificates: {data: [{type: "certificates", id: certificate_id}]}
+              }
+            }
+          })
+          profile = profile_response.fetch("data")
+          attributes = profile.fetch("attributes")
+          profile_path = File.join(ENV.fetch("RUNNER_TEMP"), "Listello-iCloud.mobileprovision")
+          File.binwrite(profile_path, Base64.decode64(attributes.fetch("profileContent")))
+          install_dir = File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
+          FileUtils.mkdir_p(install_dir)
+          FileUtils.cp(profile_path, File.join(install_dir, "#{attributes.fetch("uuid")}.mobileprovision"))
+          File.open(ENV.fetch("GITHUB_ENV"), "a") do |file|
+            file.puts "LISTELLO_PROFILE_PATH=#{profile_path}"
+            file.puts "LISTELLO_PROFILE_NAME=#{profile_name}"
+          end
+          puts "Created #{profile_name} (#{attributes.fetch("uuid")})"
           RUBY
 
-      - name: Configure capabilities and verify distribution signing
+      - name: Verify profile entitlements and distribution signing
         working-directory: Listello
-        env:
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
         run: |
           set -euo pipefail
+          security cms -D -i "$LISTELLO_PROFILE_PATH" > "$RUNNER_TEMP/Listello-profile.plist"
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.icloud-container-identifiers' "$RUNNER_TEMP/Listello-profile.plist" \
+            | grep -F 'iCloud.com.krabople.morrow'
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$RUNNER_TEMP/Listello-profile.plist"
+
           xcodebuild archive \
             -project Listello.xcodeproj \
             -scheme Listello \
@@ -120,11 +212,9 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath .build/Archives/Listello-Signing-Check.xcarchive \
             -derivedDataPath .build/DerivedData-Signing-Check \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$APPSTORE_KEY_PATH" \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$LISTELLO_PROFILE_NAME" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             | xcbeautify --renderer github-actions
 
