@@ -13,7 +13,7 @@ concurrency:
 jobs:
   configure:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       TEAM_ID: 6YYA8L76Y8
 
@@ -145,7 +145,7 @@ jobs:
             -T /usr/bin/codesign
           security find-identity -v -p codesigning
 
-      - name: Provision capabilities and archive
+      - name: Provision capabilities and build signed app
         working-directory: Listello
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
@@ -153,13 +153,12 @@ jobs:
         run: |
           set -euo pipefail
           set -o pipefail
-          xcodebuild archive \
+          xcodebuild build \
             -project Listello.xcodeproj \
             -scheme Listello \
-            -configuration Release \
+            -configuration Debug \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -archivePath .build/Archives/Listello-Signing-Check.xcarchive \
             -derivedDataPath .build/DerivedData-Signing-Check \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$APPSTORE_KEY_PATH" \
@@ -167,19 +166,20 @@ jobs:
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$TEAM_ID" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             | xcbeautify --renderer github-actions
 
       - name: Verify signed iCloud entitlements
         working-directory: Listello
         run: |
           set -euo pipefail
-          APP_PATH=".build/Archives/Listello-Signing-Check.xcarchive/Products/Applications/Listello.app"
+          APP_PATH=".build/DerivedData-Signing-Check/Build/Products/Debug-iphoneos/Listello.app"
           codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/listello-entitlements.plist"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.ubiquity-kvstore-identifier" "$RUNNER_TEMP/listello-entitlements.plist" \
             | grep -F "com.krabople.morrow"
           /usr/libexec/PlistBuddy -c "Print :aps-environment" "$RUNNER_TEMP/listello-entitlements.plist" \
             | grep -E "development|production"
-          echo "Listello archive contains its iCloud key-value and push entitlements."
+          echo "Listello signed device build contains its iCloud key-value and push entitlements."
 
       - name: Revoke temporary development certificate
         if: always()
