@@ -75,10 +75,13 @@ jobs:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         run: |
           ruby <<'RUBY'
           require "base64"
           require "json"
+          require "digest"
           require "net/http"
           require "openssl"
           require "fileutils"
@@ -149,21 +152,32 @@ jobs:
             puts "Enabled #{capability_type}"
           end
 
-          profiles_response = api(
+          certificates_response = api(
             :get,
-            "/v1/profiles?filter[profileType]=IOS_APP_STORE&include=bundleId,certificates&fields[profiles]=name,uuid,profileContent,profileState,profileType&limit=200",
+            "/v1/certificates?fields[certificates]=name,certificateType,displayName,serialNumber,certificateContent,expirationDate&limit=200",
             token
           )
-          listello_profiles = profiles_response.fetch("data").select do |profile|
-            profile.dig("relationships", "bundleId", "data", "id") == bundle_id
+          p12 = OpenSSL::PKCS12.new(
+            Base64.decode64(ENV.fetch("BUILD_CERTIFICATE_BASE64")),
+            ENV.fetch("P12_PASSWORD")
+          )
+          local_fingerprint = Digest::SHA1.hexdigest(p12.certificate.to_der)
+          distribution_certificate = certificates_response.fetch("data").find do |certificate|
+            content = certificate.dig("attributes", "certificateContent")
+            next false unless content
+            remote = OpenSSL::X509::Certificate.new(Base64.decode64(content))
+            Digest::SHA1.hexdigest(remote.to_der) == local_fingerprint
           end
-          source_profile = listello_profiles.find { |profile| profile.dig("attributes", "name").include?("Morrow") } || listello_profiles.first
-          abort "No existing Listello App Store profile was found to identify its distribution certificate" unless source_profile
-          certificate_id = source_profile.dig("relationships", "certificates", "data", 0, "id")
-          abort "The existing Listello profile has no distribution certificate" unless certificate_id
+          abort "The imported Apple Distribution certificate was not found in the developer account" unless distribution_certificate
+          certificate_id = distribution_certificate.fetch("id")
 
           profile_name = "AppStore Listello iCloud GitHub"
-          existing = listello_profiles.find { |profile| profile.dig("attributes", "name") == profile_name }
+          profiles_response = api(
+            :get,
+            "/v1/profiles?filter[profileType]=IOS_APP_STORE&fields[profiles]=name,uuid,profileContent,profileState,profileType&limit=200",
+            token
+          )
+          existing = profiles_response.fetch("data").find { |profile| profile.dig("attributes", "name") == profile_name }
           if existing
             api(:delete, "/v1/profiles/#{existing.fetch("id")}", token)
           end
