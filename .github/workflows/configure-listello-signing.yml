@@ -18,8 +18,8 @@ concurrency:
 
 jobs:
   configure:
-    runs-on: macos-15
-    timeout-minutes: 20
+    runs-on: macos-26
+    timeout-minutes: 45
     env:
       TEAM_ID: 6YYA8L76Y8
 
