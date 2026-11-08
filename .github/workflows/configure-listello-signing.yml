@@ -104,6 +104,7 @@ jobs:
             request_class = {
               get: Net::HTTP::Get,
               post: Net::HTTP::Post,
+              patch: Net::HTTP::Patch,
               delete: Net::HTTP::Delete
             }.fetch(method)
             request = request_class.new(uri)
@@ -151,6 +152,28 @@ jobs:
             })
             puts "Enabled #{capability_type}"
           end
+
+          bundle_response = api(
+            :get,
+            "/v1/bundleIds?filter[identifier]=com.krabople.morrow&include=bundleIdCapabilities&fields[bundleIds]=name,identifier&fields[bundleIdCapabilities]=capabilityType,settings",
+            token
+          )
+          icloud_capability = bundle_response.fetch("included", []).find do |item|
+            item.dig("attributes", "capabilityType") == "ICLOUD"
+          end
+          abort "Listello's iCloud capability was not returned after enabling it" unless icloud_capability
+          api(:patch, "/v1/bundleIdCapabilities/#{icloud_capability.fetch("id")}", token, {
+            data: {
+              type: "bundleIdCapabilities",
+              id: icloud_capability.fetch("id"),
+              relationships: {
+                cloudContainers: {
+                  data: [{type: "cloudContainers", id: "C852D5MN4N"}]
+                }
+              }
+            }
+          })
+          puts "Associated iCloud.com.krabople.morrow"
 
           certificates_response = api(
             :get,
